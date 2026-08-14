@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/heojeongbo/calque/main/calque.schema.json",
+  "title": "calque configuration",
+  "description": "Configuration for calque, which generates ORM code from orm-annotated .proto files for one or more target languages and storage backends. Point an editor at this with a modeline: # yaml-language-server: $schema=https://raw.githubusercontent.com/heojeongbo/calque/main/calque.schema.json",
+  "type": "object",
+  "required": ["version", "targets"],
+  "properties": {
+    "version": {
+      "const": 1,
+      "description": "The config format version. Required, so that a future format change reports itself instead of producing a cascade of errors about keys that were valid in the version you wrote."
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "description": "What to generate. Each entry pairs a language target with a storage backend. Two entries may name the same target, if one of them is given a distinct `name`.",
+      "items": {
+        "type": "object",
+        "required": ["target", "backend"],
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "description": "A target registered in the calque binary being run, and the key of that target's own top-level options section.",
+            "examples": ["ts", "go"]
+          },
+          "backend": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "description": "A storage backend registered in the calque binary being run. The target must support it: pairing a language with a store its runtime has no adapter for is refused at generate time, not discovered at import time.",
+            "examples": ["dexie", "memory", "entsql"]
+          },
+          "out": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).*$",
+            "description": "A subdirectory of the output root buf gives the plugin. Not an output root of its own -- buf owns that. An absolute path, or one containing '..', is refused.",
+            "examples": ["", "ts", "gen/ts"]
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "description": "Disambiguates two entries with the same target, and is the key for per-instance option sections. Defaults to the target name."
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": true,
+  "$comment": "The top level is deliberately open: every target and backend claims a section named after itself, and this schema cannot know which ones a given calque binary registers. calque itself rejects any top-level section nothing claimed, so a misspelled section name is still loud -- it just fails at generate time rather than in the editor."
+}
