@@ -1,0 +1,3 @@
+# Copy to .npmrc (gitignored) and fill in a token to publish.
+registry=https://registry.npmjs.org
+//registry.npmjs.org/:_authToken=YOUR_NPM_TOKEN

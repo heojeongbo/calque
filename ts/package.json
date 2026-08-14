@@ -1,0 +1,24 @@
+{
+  "name": "calque-ts-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "description": "TypeScript runtimes for calque-generated ORM code.",
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:coverage": "pnpm -r test:coverage",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "check": "biome check .",
+    "release:runtime": "pnpm --filter @heojeongbo/calque-runtime release",
+    "release:runtime:dry": "pnpm --filter @heojeongbo/calque-runtime release:dry",
+    "release:dexie": "pnpm --filter @heojeongbo/calque-dexie release",
+    "release:dexie:dry": "pnpm --filter @heojeongbo/calque-dexie release:dry"
+  },
+  "packageManager": "pnpm@10.11.0",
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.11",
+    "typescript": "^5.5.4"
+  }
+}

@@ -1,0 +1,69 @@
+{
+	"name": "@heojeongbo/calque-runtime",
+	"version": "0.1.0",
+	"description": "TypeScript runtime for calque-generated ORM code: key codecs and query descriptors.",
+	"type": "module",
+	"sideEffects": false,
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"release": "release-it",
+		"release:patch": "release-it patch",
+		"release:minor": "release-it minor",
+		"release:major": "release-it major",
+		"release:dry": "release-it --dry-run"
+	},
+	"keywords": [
+		"calque",
+		"protobuf",
+		"orm",
+		"connect",
+		"codegen",
+		"runtime"
+	],
+	"author": "heojeongbo <heojungbo@gmail.com> (https://github.com/HeoJeongBo)",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/HeoJeongBo/calque.git",
+		"directory": "ts/packages/runtime"
+	},
+	"homepage": "https://github.com/HeoJeongBo/calque#readme",
+	"bugs": {
+		"url": "https://github.com/HeoJeongBo/calque/issues"
+	},
+	"publishConfig": {
+		"access": "public",
+		"registry": "https://registry.npmjs.org"
+	},
+	"engines": {
+		"node": ">=20"
+	},
+	"peerDependencies": {
+		"@bufbuild/protobuf": "^2.10.0"
+	},
+	"devDependencies": {
+		"@bufbuild/protobuf": "^2.12.0",
+		"@vitest/coverage-v8": "^4.1.4",
+		"tsup": "^8.2.4",
+		"typescript": "^5.5.4",
+		"vitest": "^4.1.4"
+	}
+}
