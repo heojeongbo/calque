@@ -1,0 +1,66 @@
+edition = "2023";
+
+// Package namingtest is the shape conformance item 4 is about: a candidate key
+// whose proto name and JSON name differ.
+//
+// `token_hash` is `tokenHash` on a protoc-gen-es message, so a store that
+// declares its index under the proto name declares it under a name no row
+// carries. IndexedDB does not error on an unresolvable key path -- it silently
+// declines to index the record -- which is why the real instance of this has
+// been latent in production since it was written.
+//
+// Single-word props hide the bug, which is why every other fixture here has
+// only single-word keys.
+package namingtest;
+
+import "orm.proto";
+
+option features.field_presence = IMPLICIT;
+
+message Device {
+  bytes id = 1 [(orm.field) = {
+    type: TYPE_UUID
+    key: true
+    default: ""
+  }];
+
+  // Multi-word and unique: the two conditions together.
+  string token_hash = 4 [(orm.field) = {
+    unique: true
+    default: ""
+  }];
+
+  // Multi-word, in a composite index rather than a key of its own.
+  string device_id = 5 [(orm.field) = {default: ""}];
+
+  string alias = 6 [(orm.field) = {default: ""}];
+
+  option (orm.message) = {
+    rpc: {crud: true}
+    indexes: [
+      {
+        name: "device"
+        refs: [
+          {
+            name: "device_id"
+            number: 5
+          }
+        ]
+        unique: true
+      },
+      {
+        name: "pair"
+        refs: [
+          {
+            name: "alias"
+            number: 6
+          },
+          {
+            name: "device_id"
+            number: 5
+          }
+        ]
+      }
+    ]
+  };
+}
