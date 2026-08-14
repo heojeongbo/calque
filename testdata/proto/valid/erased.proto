@@ -1,0 +1,67 @@
+edition = "2023";
+
+// Package erasedtest exercises the two shapes apptest.proto does not: an
+// entity that erases softly, and a unique edge used as a lookup key.
+//
+// The unique edge is the shape protoc-gen-orm-ts crashes on. It has two type
+// switches over the same three-variant union, both ending in
+// panic("unimplemented: key type not Field"); one was fixed in June 2026 and
+// the other, in the get() emitter, still is not. A unique edge as a candidate
+// key reaches it.
+package erasedtest;
+
+import "google/protobuf/timestamp.proto";
+import "orm.proto";
+
+option features.field_presence = IMPLICIT;
+
+message Holder {
+  bytes id = 1 [(orm.field) = {
+    type: TYPE_UUID
+    key: true
+    default: ""
+  }];
+  string alias = 4 [(orm.field) = {
+    unique: true
+    default: ""
+  }];
+
+  option (orm.message) = {rpc: {crud: true}};
+}
+
+message Credential {
+  bytes id = 1 [(orm.field) = {
+    type: TYPE_UUID
+    key: true
+    default: ""
+  }];
+
+  // A unique edge: at most one credential per holder, and a lookup key.
+  Holder holder = 2 [(orm.edge) = {unique: true}];
+
+  string username = 4 [(orm.field) = {
+    unique: true
+    default: ""
+  }];
+
+  // Not patchable: absent from the patch request entirely.
+  string secret = 5 [(orm.field) = {
+    immutable: true
+    default: ""
+  }];
+
+  // Nullable, so a patch needs a companion to say "write null" -- proto's
+  // implicit presence cannot tell an absent value from an empty one.
+  string note = 6 [
+    features.field_presence = EXPLICIT,
+    (orm.field) = {nullable: true}
+  ];
+
+  google.protobuf.Timestamp date_updated = 14 [(orm.field) = {version: {}}];
+
+  // Erasing stamps this rather than removing the row, so every read has to
+  // exclude the rows that carry one.
+  google.protobuf.Timestamp date_erased = 15 [(orm.field) = {erased: {}}];
+
+  option (orm.message) = {rpc: {crud: true}};
+}
