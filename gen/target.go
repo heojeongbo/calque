@@ -1,6 +1,12 @@
 package gen
 
 import (
+	"fmt"
+	"io"
+
+	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/pluginpb"
+
 	"github.com/HeoJeongBo/calque/schema"
 )
 
@@ -52,6 +58,34 @@ type Generator struct {
 	config  *Config
 	entry   TargetConfig
 	diags   *schema.Diagnostics
+
+	req   *pluginpb.CodeGeneratorRequest
+	files *protoregistry.Files
+	warn  io.Writer
+}
+
+// Request is the plugin request this generation came from.
+//
+// It is here for a target that needs a descriptor fact the schema deliberately
+// does not carry — the TypeScript target reads each entity's service and Ref
+// message, and the Go target hands the whole request to protogen for Go
+// identifiers and import paths.
+//
+// It must not be used for names. schema.Names is the only source of those, and
+// mixing the two is the device_id bug.
+func (g *Generator) Request() *pluginpb.CodeGeneratorRequest { return g.req }
+
+// Files is the resolved descriptor set, for looking up a message or service by
+// name.
+func (g *Generator) Files() *protoregistry.Files { return g.files }
+
+// Warnf reports something worth saying that is not worth stopping for. buf
+// shows a plugin's stderr, so this reaches the person running the build.
+func (g *Generator) Warnf(format string, a ...any) {
+	if g.warn == nil {
+		return
+	}
+	fmt.Fprintf(g.warn, "calque: "+format+"\n", a...)
 }
 
 // NewGenerator builds the view a target is given. It is exported for targets'

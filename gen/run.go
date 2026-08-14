@@ -1,7 +1,12 @@
 package gen
 
 import (
+	"io"
+
 	"fmt"
+
+	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/pluginpb"
 
 	"github.com/HeoJeongBo/calque/schema"
 )
@@ -13,7 +18,12 @@ import (
 // schema against each backend's capabilities, and only then render. A user who
 // misspelled an option finds out before a file exists, not from output that
 // quietly used a default.
-func Run(s *schema.Schema, cfg *Config, r *Registry) (*Output, error) {
+func Run(s *schema.Schema, cfg *Config, r *Registry, options ...RunOption) (*Output, error) {
+	opts := runOpts{warn: io.Discard}
+	for _, o := range options {
+		o(&opts)
+	}
+
 	// What main got wrong comes first: every message after this assumes the
 	// registry describes one coherent build.
 	if err := r.Err(); err != nil {
@@ -68,8 +78,13 @@ func Run(s *schema.Schema, cfg *Config, r *Registry) (*Output, error) {
 	var diags schema.Diagnostics
 
 	for _, p := range plan {
+		// Facts first, then policy. A backend that is not strict still has the
+		// shortfall computed and reported; it just does not stop.
 		if err := CheckCapabilities(s, p.backend); err != nil {
-			return nil, fmt.Errorf("%s: %w", p.entry.Label(), err)
+			if p.backend.Strict() {
+				return nil, fmt.Errorf("%s: %w", p.entry.Label(), err)
+			}
+			fmt.Fprintf(opts.warn, "calque: %s: %v\n", p.entry.Label(), err)
 		}
 
 		lowered, err := p.backend.Lower(s)
@@ -81,6 +96,7 @@ func Run(s *schema.Schema, cfg *Config, r *Registry) (*Output, error) {
 		}
 
 		g := NewGenerator(s, lowered, p.backend, cfg, p.entry, &diags)
+		g.req, g.files, g.warn = opts.req, opts.files, opts.warn
 		files, err := p.target.Emit(g)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", p.entry.Label(), err)
@@ -118,4 +134,31 @@ func checkCodecs(l *Lowered, b Backend) error {
 		}
 	}
 	return nil
+}
+
+// RunOption tunes a run.
+type RunOption func(*runOpts)
+
+type runOpts struct {
+	req   *pluginpb.CodeGeneratorRequest
+	files *protoregistry.Files
+	warn  io.Writer
+}
+
+// WithDescriptors hands targets the descriptor facts the schema deliberately
+// does not carry: services, Ref messages, Go identifiers.
+//
+// The schema stays the only source of names. This is for everything else.
+func WithDescriptors(req *pluginpb.CodeGeneratorRequest, files *protoregistry.Files) RunOption {
+	return func(o *runOpts) { o.req, o.files = req, files }
+}
+
+// WithWarnings is where a shortfall goes when a backend is not strict. buf
+// shows a plugin's stderr, so this reaches the person running the build.
+func WithWarnings(w io.Writer) RunOption {
+	return func(o *runOpts) {
+		if w != nil {
+			o.warn = w
+		}
+	}
 }

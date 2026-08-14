@@ -100,6 +100,16 @@ type Backend interface {
 	// anything is lowered, so a bad option fails before a file is rendered.
 	Configure(cfg *Config, section string) error
 
+	// Strict reports whether a capability shortfall stops generation.
+	//
+	// Capabilities states facts; this states policy, and they are separate on
+	// purpose. A backend reproducing an older generator bug for bug answers
+	// false, and the shortfall is reported on stderr instead of refusing —
+	// otherwise adopting calque on an existing schema would generate nothing at
+	// all, which is not a migration anyone can perform. It answers true once
+	// the constraint is meant to be real.
+	Strict() bool
+
 	// StorePath is where a prop's value lives in a stored record.
 	//
 	// It uses schema.VisitElem, so a new Elem variant is a compile error here

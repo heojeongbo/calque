@@ -33,10 +33,32 @@ import (
 // anything. Which files were asked for decides what is emitted, not what is
 // modelled, and Schema.Sources is where that distinction lives.
 func Parse(req *pluginpb.CodeGeneratorRequest) (*schema.Schema, error) {
+	s, _, err := ParseFiles(req)
+	return s, err
+}
+
+// ParseFiles is Parse, and also hands back the resolved file set.
+//
+// A target needs descriptors the schema deliberately does not carry: the
+// TypeScript target reads each entity's service and its Ref message to emit a
+// client, and the Go target needs protogen's idea of a Go identifier. Resolving
+// the closure twice to get them would be wasteful and, worse, would leave two
+// registries that could disagree.
+//
+// The schema stays the only source of *names*. This is for descriptor facts.
+func ParseFiles(req *pluginpb.CodeGeneratorRequest) (*schema.Schema, *protoregistry.Files, error) {
 	files, err := resolve(req.GetProtoFile())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	s, err := parseWith(req, files)
+	if err != nil {
+		return nil, nil, err
+	}
+	return s, files, nil
+}
+
+func parseWith(req *pluginpb.CodeGeneratorRequest, files *protoregistry.Files) (*schema.Schema, error) {
 
 	generate := make(map[string]bool, len(req.GetFileToGenerate()))
 	for _, name := range req.GetFileToGenerate() {

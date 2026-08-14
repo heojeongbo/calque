@@ -33,6 +33,9 @@ func fixtureSchema(t *testing.T) *schema.Schema {
 type fakeBackend struct {
 	name string
 	caps gen.Capabilities
+	// lenient makes the backend report a capability shortfall rather than
+	// refuse, which is what a bug-for-bug compatibility mode does.
+	lenient bool
 	// codec, when set, overrides what Codec returns, so a test can make a
 	// backend name a transform it does not implement.
 	codec gen.CodecName
@@ -41,6 +44,7 @@ type fakeBackend struct {
 func (b *fakeBackend) Name() string                        { return b.name }
 func (b *fakeBackend) Capabilities() gen.Capabilities      { return b.caps }
 func (b *fakeBackend) Configure(*gen.Config, string) error { return nil }
+func (b *fakeBackend) Strict() bool                        { return !b.lenient }
 
 func (b *fakeBackend) StorePath(p schema.Prop) (schema.StorePath, error) {
 	return schema.StorePath{schema.StoreName(p.Name())}, nil

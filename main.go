@@ -1,14 +1,14 @@
-// Command protoc-gen-calque turns orm-annotated .proto files into ORM code for
-// whichever target languages and storage backends a calque.yaml selects.
+// Command calque turns orm-annotated .proto files into ORM code for whichever
+// target languages and storage backends a calque.yaml selects.
 //
-// It is a protoc plugin, so it is run by buf rather than directly:
+// It is a protoc plugin, so buf runs it rather than a person:
 //
 //	plugins:
 //	  - local: [go, run, github.com/HeoJeongBo/calque]
 //	    out: gen
 //	    opt: [config=calque.yaml]
 //
-// The targets and backends a given binary knows are the ones registered here,
+// The targets and backends a given binary knows are the ones registered below,
 // at composition time. There is no config-driven loading of third-party ones:
 // Go's runtime plugin support is Linux-only and requires an identical toolchain
 // and identical build flags, which is a worse contract than a twenty-five line
@@ -16,48 +16,16 @@
 package main
 
 import (
-	"fmt"
-	"io"
 	"os"
 
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/pluginpb"
+	"github.com/HeoJeongBo/calque/gen"
+	"github.com/HeoJeongBo/calque/plugin"
 )
 
-func main() { os.Exit(run(os.Stdin, os.Stdout, os.Stderr)) }
+func main() { os.Exit(plugin.Serve(os.Stdin, os.Stdout, os.Stderr, registry())) }
 
-// run reads a CodeGeneratorRequest and writes a CodeGeneratorResponse.
-//
-// A schema the user got wrong is reported as response.error and exits 0: that
-// is the plugin contract, and buf prints the message and fails the build
-// itself. A non-zero exit is reserved for not being able to read the request or
-// write the response, which is the only failure buf cannot explain.
-func run(stdin io.Reader, stdout, stderr io.Writer) int {
-	in, err := io.ReadAll(stdin)
-	if err != nil {
-		fmt.Fprintf(stderr, "protoc-gen-calque: read request: %v\n", err)
-		return 1
-	}
-
-	req := &pluginpb.CodeGeneratorRequest{}
-	if err := proto.Unmarshal(in, req); err != nil {
-		fmt.Fprintf(stderr, "protoc-gen-calque: parse request: %v\n", err)
-		return 1
-	}
-
-	// TODO(step 14): resolve the registry and hand off to plugin.Serve.
-	res := &pluginpb.CodeGeneratorResponse{
-		Error: proto.String("protoc-gen-calque: no targets are registered in this build"),
-	}
-
-	out, err := proto.Marshal(res)
-	if err != nil {
-		fmt.Fprintf(stderr, "protoc-gen-calque: marshal response: %v\n", err)
-		return 1
-	}
-	if _, err := stdout.Write(out); err != nil {
-		fmt.Fprintf(stderr, "protoc-gen-calque: write response: %v\n", err)
-		return 1
-	}
-	return 0
+// registry is the composition point. Adding a target or a backend is a line
+// here and nothing else.
+func registry() *gen.Registry {
+	return gen.NewRegistry()
 }
