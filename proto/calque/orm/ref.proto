@@ -1,0 +1,16 @@
+edition = "2023";
+
+package calque.orm;
+
+option go_package = "github.com/HeoJeongBo/calque/ormopt";
+
+// Ref names a field by both its name and its number, and both have to match.
+//
+// Either alone would be enough to find the field. Requiring both is what makes
+// a rename loud: an index that says `{name: "alias", number: 4}` stops
+// resolving the moment field 4 is called something else, instead of silently
+// indexing whatever took the name.
+message Ref {
+  string name = 1 [features.field_presence = IMPLICIT];
+  int32 number = 2 [features.field_presence = IMPLICIT];
+}

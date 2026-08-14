@@ -1,0 +1,66 @@
+edition = "2023";
+
+// Package vocabtest is annotated with the *upstream* vocabulary -- it imports
+// "orm.proto" and writes (orm.field), exactly as a user's existing proto does.
+//
+// calque does not link upstream's Go types. This file exists so a test can
+// prove that the vendored calque.orm types decode it anyway, because protobuf
+// resolves an extension by its number and not by its name. If that ever stops
+// being true, vendoring is the wrong call and this test is where it says so.
+package vocabtest;
+
+import "google/protobuf/timestamp.proto";
+import "orm.proto";
+
+option features.field_presence = IMPLICIT;
+
+message Account {
+  bytes id = 1 [(orm.field) = {
+    type: TYPE_UUID
+    key: true
+    default: ""
+  }];
+  string alias = 4 [(orm.field) = {
+    unique: true
+    default: ""
+  }];
+  string name = 5 [(orm.field) = {default: ""}];
+
+  Team team = 2 [(orm.edge) = {}];
+
+  google.protobuf.Timestamp date_updated = 14 [(orm.field) = {version: {}}];
+
+  option (orm.message) = {
+    rpc: {crud: true}
+    indexes: [
+      {
+        name: "slug"
+        refs: [
+          {
+            name: "alias"
+            number: 4
+          },
+          {
+            name: "team"
+            number: 2
+          }
+        ]
+        unique: true
+      }
+    ]
+  };
+}
+
+message Team {
+  bytes id = 1 [(orm.field) = {
+    type: TYPE_UUID
+    key: true
+    default: ""
+  }];
+  string alias = 4 [(orm.field) = {
+    unique: true
+    default: ""
+  }];
+
+  option (orm.message) = {rpc: {crud: true}};
+}

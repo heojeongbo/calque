@@ -1,0 +1,21 @@
+edition = "2023";
+
+package orm;
+
+option go_package = "github.com/protobuf-orm/protobuf-orm/ormpb";
+
+message RpcAdd {
+  bool disabled = 1;
+}
+
+message RpcGet {
+  bool disabled = 1;
+}
+
+message RpcPatch {
+  bool disabled = 1;
+}
+
+message RpcErase {
+  bool disabled = 1;
+}

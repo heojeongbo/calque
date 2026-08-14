@@ -1,0 +1,37 @@
+edition = "2023";
+
+// Package calque.orm is calque's copy of the annotation vocabulary published as
+// buf.build/orm/orm by github.com/protobuf-orm/protobuf-orm.
+//
+// The copy exists so that calque depends on the *contract* rather than on the
+// library. Extensions resolve by number, not by name, so a proto that imports
+// the upstream "orm.proto" and writes `(orm.field)` decodes through the types
+// generated from these files unchanged -- the field numbers are what has to
+// match, and testdata/proto/_upstream holds the real upstream files so a test
+// can prove it rather than assert it.
+//
+// Depending on the library instead is what protoc-gen-orm-ts did, and its
+// go.mod pins a protobuf-orm older than a method its own code calls, so its
+// HEAD does not compile and its committed output was generated against an IR
+// newer than its module graph declares. A copy cannot drift that way: it is
+// either the same as upstream or a test says it is not.
+//
+// Only the annotation vocabulary is copied. orm/order.proto and
+// orm/patch_op.proto describe the generated request surface rather than the
+// annotations, and calque derives that surface itself, so vendoring them would
+// imply calque honours something it does not read.
+package calque.orm;
+
+import "calque/orm/options.proto";
+import "google/protobuf/descriptor.proto";
+
+option go_package = "github.com/HeoJeongBo/calque/ormopt";
+
+extend google.protobuf.MessageOptions {
+  MessageOptions message = 45001;
+}
+
+extend google.protobuf.FieldOptions {
+  FieldOptions field = 45101;
+  EdgeOptions edge = 45102;
+}

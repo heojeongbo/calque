@@ -1,0 +1,21 @@
+edition = "2023";
+
+package calque.orm;
+
+option go_package = "github.com/HeoJeongBo/calque/ormopt";
+
+message RpcAdd {
+  bool disabled = 1;
+}
+
+message RpcGet {
+  bool disabled = 1;
+}
+
+message RpcPatch {
+  bool disabled = 1;
+}
+
+message RpcErase {
+  bool disabled = 1;
+}
