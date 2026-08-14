@@ -23,6 +23,9 @@ func Run(s *schema.Schema, cfg *Config, r *Registry, options ...RunOption) (*Out
 	for _, o := range options {
 		o(&opts)
 	}
+	if opts.progress == nil {
+		opts.progress = NewProgress(nil)
+	}
 
 	// What main got wrong comes first: every message after this assumes the
 	// registry describes one coherent build.
@@ -77,7 +80,11 @@ func Run(s *schema.Schema, cfg *Config, r *Registry, options ...RunOption) (*Out
 	out := NewOutput()
 	var diags schema.Diagnostics
 
+	opts.progress.Start(len(s.Sources()), len(plan))
+
 	for _, p := range plan {
+		opts.progress.TargetStart(p.entry.Label(), p.backend.Name())
+
 		// Facts first, then policy. A backend that is not strict still has the
 		// shortfall computed and reported; it just does not stop.
 		if err := CheckCapabilities(s, p.backend); err != nil {
@@ -97,6 +104,7 @@ func Run(s *schema.Schema, cfg *Config, r *Registry, options ...RunOption) (*Out
 
 		g := NewGenerator(s, lowered, p.backend, cfg, p.entry, &diags)
 		g.req, g.files, g.warn = opts.req, opts.files, opts.warn
+		g.progress, g.label = opts.progress, p.entry.Label()
 		files, err := p.target.Emit(g)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", p.entry.Label(), err)
@@ -106,7 +114,9 @@ func Run(s *schema.Schema, cfg *Config, r *Registry, options ...RunOption) (*Out
 				return nil, err
 			}
 		}
+		opts.progress.TargetDone(p.entry.Label(), p.backend.Name(), len(files))
 	}
+	opts.progress.Finish()
 
 	// A target's own diagnostics are about the schema, so they are reported
 	// the same way ormcompat's are.
@@ -140,9 +150,10 @@ func checkCodecs(l *Lowered, b Backend) error {
 type RunOption func(*runOpts)
 
 type runOpts struct {
-	req   *pluginpb.CodeGeneratorRequest
-	files *protoregistry.Files
-	warn  io.Writer
+	req      *pluginpb.CodeGeneratorRequest
+	files    *protoregistry.Files
+	warn     io.Writer
+	progress *Progress
 }
 
 // WithDescriptors hands targets the descriptor facts the schema deliberately
@@ -161,4 +172,14 @@ func WithWarnings(w io.Writer) RunOption {
 			o.warn = w
 		}
 	}
+}
+
+// WithProgress reports what the run is doing while it does it.
+//
+// It is separate from WithWarnings on purpose. Progress is a convenience and
+// can be turned off; a warning is a fact about the result and cannot. Putting
+// them behind one switch would mean `quiet` silently hid a constraint the
+// backend could not hold.
+func WithProgress(p *Progress) RunOption {
+	return func(o *runOpts) { o.progress = p }
 }

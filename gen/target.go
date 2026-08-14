@@ -62,6 +62,20 @@ type Generator struct {
 	req   *pluginpb.CodeGeneratorRequest
 	files *protoregistry.Files
 	warn  io.Writer
+
+	progress *Progress
+	label    string
+}
+
+// Step reports movement inside a target, for one with enough entities that a
+// single line at the end is not enough to tell a slow run from a stuck one.
+//
+// A target that never calls it still gets its own line when it finishes.
+func (g *Generator) Step(done, total int, what string) {
+	if g.progress == nil {
+		return
+	}
+	g.progress.Step(g.label, done, total, what)
 }
 
 // Request is the plugin request this generation came from.

@@ -86,7 +86,17 @@ func generate(req *pluginpb.CodeGeneratorRequest, r *gen.Registry, stderr io.Wri
 		return fail("%v", err)
 	}
 
-	out, err := gen.Run(s, cfg, r, gen.WithDescriptors(req, files), gen.WithWarnings(stderr))
+	// Progress goes to stderr because stdout is the response protocol. Warnings
+	// go there too, and unlike progress they are not silenceable.
+	progress := gen.NewProgress(nil)
+	if !params.Quiet {
+		progress = gen.NewProgress(stderr)
+	}
+
+	out, err := gen.Run(s, cfg, r,
+		gen.WithDescriptors(req, files),
+		gen.WithWarnings(stderr),
+		gen.WithProgress(progress))
 	if err != nil {
 		return fail("%v", err)
 	}

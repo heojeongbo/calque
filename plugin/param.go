@@ -24,6 +24,11 @@ type Params struct {
 	// produced. A plugin can only add files, so pruning is the build's job and
 	// this is what it prunes against.
 	Manifest string
+
+	// Quiet turns off progress reporting. It does not turn off warnings: a
+	// warning is a fact about the result, and hiding one behind a convenience
+	// switch is how a constraint the store cannot hold goes unnoticed.
+	Quiet bool
 }
 
 // ParseParams reads protoc's comma-separated `k=v` parameter string.
@@ -56,10 +61,19 @@ func ParseParams(param string) (*Params, error) {
 			p.Config = value
 		case "manifest":
 			p.Manifest = value
+		case "quiet":
+			switch value {
+			case "true", "1", "":
+				p.Quiet = true
+			case "false", "0":
+				p.Quiet = false
+			default:
+				return nil, fmt.Errorf("opt quiet=%q is not a boolean", value)
+			}
 		default:
 			if !strings.Contains(key, ".") {
 				return nil, fmt.Errorf(
-					"unknown opt %q; calque understands config=, manifest=, and <section>.<key>= overrides", key)
+					"unknown opt %q; calque understands config=, manifest=, quiet=, and <section>.<key>= overrides", key)
 			}
 			p.Overrides[key] = value
 		}

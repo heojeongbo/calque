@@ -98,3 +98,19 @@ func TestNoConfigAnywhereSaysWhatToDo(t *testing.T) {
 	require.ErrorContains(t, err, "opt: [config=")
 	require.ErrorContains(t, err, "where buf runs")
 }
+
+// TestQuietIsBooleanish accepts the spellings a build file is likely to use.
+func TestQuietIsBooleanish(t *testing.T) {
+	for _, s := range []string{"quiet=true", "quiet=1", "quiet="} {
+		p, err := plugin.ParseParams(s)
+		require.NoError(t, err, s)
+		require.True(t, p.Quiet, s)
+	}
+	for _, s := range []string{"quiet=false", "quiet=0"} {
+		p, err := plugin.ParseParams(s)
+		require.NoError(t, err, s)
+		require.False(t, p.Quiet, s)
+	}
+	_, err := plugin.ParseParams("quiet=yes")
+	require.ErrorContains(t, err, "is not a boolean")
+}
