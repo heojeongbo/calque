@@ -1,0 +1,15 @@
+edition = "2023";
+
+package invalid;
+
+import "google/protobuf/timestamp.proto";
+import "orm.proto";
+
+option features.field_presence = IMPLICIT;
+
+message T {
+  bytes id = 1 [(orm.field) = {type: TYPE_UUID key: true default: ""}];
+  T parent = 10 [(orm.edge) = {unique: true nullable: true}];
+  repeated T children = 11 [(orm.edge) = {from: {name: "parent" number: 10}}];
+  option (orm.message) = {rpc: {crud: true}};
+}

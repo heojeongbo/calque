@@ -1,0 +1,18 @@
+edition = "2023";
+
+package invalid;
+
+import "google/protobuf/timestamp.proto";
+import "orm.proto";
+
+option features.field_presence = IMPLICIT;
+
+message T {
+  bytes id = 1 [(orm.field) = {type: TYPE_UUID key: true default: ""}];
+  Other both = 2 [(orm.field) = {}, (orm.edge) = {}];
+  option (orm.message) = {rpc: {crud: true}};
+}
+message Other {
+  bytes id = 1 [(orm.field) = {type: TYPE_UUID key: true default: ""}];
+  option (orm.message) = {rpc: {crud: true}};
+}

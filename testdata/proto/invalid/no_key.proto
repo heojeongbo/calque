@@ -1,0 +1,13 @@
+edition = "2023";
+
+package invalid;
+
+import "google/protobuf/timestamp.proto";
+import "orm.proto";
+
+option features.field_presence = IMPLICIT;
+
+message T {
+  string alias = 1 [(orm.field) = {default: ""}];
+  option (orm.message) = {rpc: {crud: true}};
+}

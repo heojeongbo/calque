@@ -221,7 +221,25 @@ func resolveBackReferences(e *Entity, diags *Diagnostics) {
 			continue
 		}
 
+		// A unique other half means at most one row on that side, so this side
+		// cannot be a list: the two statements contradict each other and only
+		// one of them can be what was meant.
+		if other.IsUnique() && ed.spec.List {
+			at.Addf(where, "back reference %s is unique, so this edge cannot be repeated",
+				ed.spec.FromName)
+			continue
+		}
+
 		ed.inverse = other
 		other.reverse = ed
+
+		// Neither side repeated is a one-to-one relation, and both ends of one
+		// are unique. It is derived rather than declared because it is not a
+		// choice: saying `from:` on a singular edge to a singular edge has
+		// already said it.
+		if !ed.spec.List && !other.spec.List {
+			ed.spec.Unique = true
+			other.spec.Unique = true
+		}
 	}
 }

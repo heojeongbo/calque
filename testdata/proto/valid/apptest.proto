@@ -1,0 +1,99 @@
+edition = "2023";
+
+// Package apptest is the shape everything downstream is exercised against.
+//
+// It is deliberately the shape of a real schema: User has a uuid key, a
+// required edge, a nullable edge, a map, a version field, and a unique index
+// spanning a field and an edge -- which is the same "slug" index that
+// hday.oasys.Robot declares in production, and the one a document store cannot
+// enforce while a relational one can.
+package apptest;
+
+import "google/protobuf/timestamp.proto";
+import "orm.proto";
+
+option features.field_presence = IMPLICIT;
+
+message Tenant {
+  bytes id = 1 [(orm.field) = {
+    type: TYPE_UUID
+    key: true
+    default: ""
+  }];
+  string alias = 4 [(orm.field) = {
+    unique: true
+    default: ""
+  }];
+  string name = 5 [(orm.field) = {default: ""}];
+
+  google.protobuf.Timestamp date_created = 15 [(orm.field) = {
+    immutable: true
+    default: ""
+  }];
+
+  option (orm.message) = {rpc: {crud: true}};
+}
+
+message User {
+  bytes id = 1 [(orm.field) = {
+    type: TYPE_UUID
+    key: true
+    default: ""
+  }];
+
+  Tenant tenant = 2 [(orm.edge) = {}];
+
+  string alias = 4 [(orm.field) = {default: ""}];
+  string name = 5 [(orm.field) = {default: ""}];
+
+  // No annotation at all: a prop that says nothing is a field whose type is
+  // deduced, and a map deduces to json.
+  map<string, string> labels = 7;
+
+  // Explicit presence, so this one really is nullable.
+  string lock = 8 [
+    features.field_presence = EXPLICIT,
+    (orm.field) = {nullable: true}
+  ];
+
+  // A message with no (orm.edge) is stored, not related: json.
+  Profile profile = 9;
+
+  // A timestamp is a message and every message field has presence, so without
+  // the time exception this would be nullable and no schema could say
+  // otherwise.
+  google.protobuf.Timestamp date_updated = 14 [(orm.field) = {version: {}}];
+  google.protobuf.Timestamp date_created = 15 [(orm.field) = {
+    immutable: true
+    default: ""
+  }];
+
+  // Opted out entirely: computed, never stored.
+  string state = 16 [(orm.field) = {disabled: true}];
+
+  option (orm.message) = {
+    rpc: {crud: true}
+    indexes: [
+      {
+        name: "slug"
+        refs: [
+          {
+            name: "alias"
+            number: 4
+          },
+          {
+            name: "tenant"
+            number: 2
+          }
+        ]
+        unique: true
+      }
+    ]
+  };
+}
+
+// Profile is not an entity. It is here so that a message field with no edge
+// annotation has something to be.
+message Profile {
+  string bio = 1;
+}
