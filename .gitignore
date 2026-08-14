@@ -1,0 +1,6 @@
+.DS_Store
+/calque
+/protoc-gen-calque
+
+node_modules/
+dist/
