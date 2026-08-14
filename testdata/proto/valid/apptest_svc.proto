@@ -1,0 +1,68 @@
+edition = "2023";
+
+// The service contract protoc-gen-orm-service would generate for apptest.
+//
+// calque does not emit this — it is a different plugin's job and a different
+// repository's step — but the TypeScript target reads it: an entity with no
+// service produces no table, the Ref message's oneof decides what a lookup case
+// is called, and a method's response type decides how an entity is pulled out
+// of it.
+//
+// Hand-written here, and deliberately small: the shapes that matter are the ref
+// oneof, a get, and a list whose response wraps the entity in a field.
+package apptest;
+
+import "apptest.proto";
+
+message TenantRef {
+  oneof key {
+    bytes id = 1;
+    string alias = 4;
+  }
+}
+
+message TenantSelect {
+  bool all = 1;
+}
+
+message TenantGetRequest {
+  TenantRef ref = 1;
+  TenantSelect select = 2;
+}
+
+service TenantService {
+  rpc Get(TenantGetRequest) returns (Tenant);
+}
+
+message UserRefBySlug {
+  string alias = 4;
+  TenantRef tenant = 2;
+}
+
+message UserRef {
+  oneof key {
+    bytes id = 1;
+    UserRefBySlug slug = 4;
+  }
+}
+
+message UserSelect {
+  bool all = 1;
+}
+
+message UserGetRequest {
+  UserRef ref = 1;
+  UserSelect select = 2;
+}
+
+message UserListRequest {}
+
+message UserListResponse {
+  repeated User items = 1;
+}
+
+service UserService {
+  rpc Add(User) returns (User);
+  rpc Get(UserGetRequest) returns (User);
+  rpc List(UserListRequest) returns (UserListResponse);
+}
