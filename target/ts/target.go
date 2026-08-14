@@ -13,7 +13,6 @@ package ts
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -196,11 +195,23 @@ func (t *Target) group(g *gen.Generator) ([]*pkg, error) {
 	// Every generate-marked file contributes its package, so a package with
 	// services and no entities still gets its client.g.ts — the predecessor
 	// emits those, and an absent file is a diff.
+	//
+	// The walk is over ProtoFile rather than FileToGenerate, because that is
+	// the order protoc sends: dependency-first, which is what decides the order
+	// services appear in. ormcompat walks the same list for the same reason,
+	// so entities and services agree.
 	if files := g.Files(); files != nil {
+		generate := map[string]bool{}
 		for _, name := range g.Request().GetFileToGenerate() {
-			fd, err := files.FindFileByPath(name)
+			generate[name] = true
+		}
+		for _, fdp := range g.Request().GetProtoFile() {
+			if !generate[fdp.GetName()] {
+				continue
+			}
+			fd, err := files.FindFileByPath(fdp.GetName())
 			if err != nil {
-				return nil, fmt.Errorf("ts: %s: %w", name, err)
+				return nil, fmt.Errorf("ts: %s: %w", fdp.GetName(), err)
 			}
 			p := add(string(fd.Package()))
 
@@ -272,18 +283,14 @@ func caseLabel(ref protoreflect.MessageDescriptor, key schema.Elem) (string, boo
 	return "", false
 }
 
-// sortedServices keeps client.g.ts stable when a package's services arrive from
-// more than one file.
-func sortedServices(p *pkg) []protoreflect.ServiceDescriptor {
-	out := append([]protoreflect.ServiceDescriptor(nil), p.services...)
-	sort.SliceStable(out, func(i, j int) bool {
-		if out[i].ParentFile().Path() != out[j].ParentFile().Path() {
-			return out[i].ParentFile().Path() < out[j].ParentFile().Path()
-		}
-		return out[i].Index() < out[j].Index()
-	})
-	return out
-}
+// orderedServices is the services in the order they were collected, which is
+// request order: dependency-first, as protoc sends it.
+//
+// Sorting them would be tidier and wrong. The order in the committed output is
+// Audit, Auth, Tenant, Btree, ... which is neither alphabetical nor by path --
+// it is the order the files arrive in, and matching it is the difference
+// between a clean diff and a reordered one.
+func orderedServices(p *pkg) []protoreflect.ServiceDescriptor { return p.services }
 
 // emitDb writes db.g.ts: the intersection type, the client interface, the
 // service map, and the schema map the application feeds to Dexie.

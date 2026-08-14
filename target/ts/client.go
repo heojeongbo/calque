@@ -18,7 +18,7 @@ import (
 // declarations, which is what the predecessor produces and therefore what the
 // diff expects.
 func (t *Target) emitClient(g *gen.Generator, p *pkg) ([]byte, error) {
-	services := sortedServices(p)
+	services := orderedServices(p)
 
 	f := tsw.New()
 	f.P(t.opts.Header)
@@ -27,19 +27,18 @@ func (t *Target) emitClient(g *gen.Generator, p *pkg) ([]byte, error) {
 	f.P(`import type { QueryDescOf } from "`, t.opts.Runtime, `";`)
 	f.P()
 
+	// The blank lines are unconditional. A package with no services still gets
+	// all of them, which is why hday/common/client.g.ts has three in a row --
+	// and a diff is a diff.
 	for _, svc := range services {
 		f.P(`import { `, svc.Name(), ` } from "./`, pbModule(svc.ParentFile().Path()), t.opts.ImportExtension, `";`)
 	}
-	if len(services) > 0 {
-		f.P()
-	}
+	f.P()
 
 	for _, svc := range services {
 		f.P(`export type `, svc.Name(), `Client = C<typeof `, svc.Name(), `>`)
 	}
-	if len(services) > 0 {
-		f.P()
-	}
+	f.P()
 
 	f.P(`export interface ServiceClient {`)
 	for _, svc := range services {
@@ -52,16 +51,20 @@ func (t *Target) emitClient(g *gen.Generator, p *pkg) ([]byte, error) {
 		// No space before "=". That is what the predecessor emits.
 		f.P(`export const `, clientKey(svc), `= `, svc.Name(), `.method;`)
 	}
-	if len(services) > 0 {
-		f.P()
-	}
+	f.P()
 
+	// queries is keyed by service and ordered by service, not by entity. The two
+	// orders differ -- the committed output starts with AuditService while the
+	// entities start with Tenant -- so walking the wrong one reorders the whole
+	// table.
 	f.P(`export const queries = {`)
-	for _, e := range p.entities {
-		if e.service == nil {
-			continue
+	for _, svc := range services {
+		for _, e := range p.entities {
+			if e.service == svc {
+				t.emitQueryDesc(g, f, e)
+				break
+			}
 		}
-		t.emitQueryDesc(g, f, e)
 	}
 	f.P(`}`)
 	f.P()
@@ -109,8 +112,11 @@ func (t *Target) emitQueryDesc(g *gen.Generator, f *tsw.File, e *entity) {
 	methods := svc.Methods()
 	for i := range methods.Len() {
 		m := methods.Get(i)
-		f.P("\t\t\t", tsw.LowerFirst(string(m.Name())), ": { desc: ", clientKey(svc), ".",
-			tsw.LowerFirst(string(m.Name())), ", extract: v => ", extractor(def, m), " },")
+		name := tsw.LowerFirst(string(m.Name()))
+		f.P("\t\t\t", name, ": {")
+		f.P("\t\t\t\tdesc: ", clientKey(svc), ".", name, ",")
+		f.P("\t\t\t\textract: v => ", extractor(def, m))
+		f.P("\t\t\t},")
 	}
 	f.P("\t\t}")
 

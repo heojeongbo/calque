@@ -25,7 +25,10 @@ export const queries = {
 			{key:{case: "alias", value: v.alias}},
 		],
 		rpc: {
-			get: { desc: tenant.get, extract: v => v },
+			get: {
+				desc: tenant.get,
+				extract: v => v
+			},
 		}
 	} satisfies QueryDescOf<typeof TenantService>,
 	["apptest.UserService"]: {
@@ -41,9 +44,18 @@ export const queries = {
 			}},
 		],
 		rpc: {
-			add: { desc: user.add, extract: v => v },
-			get: { desc: user.get, extract: v => v },
-			list: { desc: user.list, extract: v => v.items },
+			add: {
+				desc: user.add,
+				extract: v => v
+			},
+			get: {
+				desc: user.get,
+				extract: v => v
+			},
+			list: {
+				desc: user.list,
+				extract: v => v.items
+			},
 		}
 	} satisfies QueryDescOf<typeof UserService>,
 }
