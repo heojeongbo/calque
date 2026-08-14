@@ -18,8 +18,12 @@ package main
 import (
 	"os"
 
+	"github.com/HeoJeongBo/calque/backend/dexie"
+	"github.com/HeoJeongBo/calque/backend/entsql"
 	"github.com/HeoJeongBo/calque/gen"
 	"github.com/HeoJeongBo/calque/plugin"
+	"github.com/HeoJeongBo/calque/target/gotarget"
+	"github.com/HeoJeongBo/calque/target/ts"
 )
 
 func main() { os.Exit(plugin.Serve(os.Stdin, os.Stdout, os.Stderr, registry())) }
@@ -27,5 +31,9 @@ func main() { os.Exit(plugin.Serve(os.Stdin, os.Stdout, os.Stderr, registry())) 
 // registry is the composition point. Adding a target or a backend is a line
 // here and nothing else.
 func registry() *gen.Registry {
-	return gen.NewRegistry()
+	return gen.NewRegistry().
+		Target(ts.New()).
+		Target(gotarget.New()).
+		Backend(dexie.New()).
+		Backend(entsql.New())
 }

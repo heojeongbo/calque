@@ -71,14 +71,40 @@ func ParseParams(param string) (*Params, error) {
 				return nil, fmt.Errorf("opt quiet=%q is not a boolean", value)
 			}
 		default:
+			// A Go target hands the whole parameter string to protogen, which
+			// parses its own options out of it. Those are passed through rather
+			// than rejected -- but by name, so a typo is still caught.
+			if forProtogen(key) {
+				continue
+			}
 			if !strings.Contains(key, ".") {
 				return nil, fmt.Errorf(
-					"unknown opt %q; calque understands config=, manifest=, quiet=, and <section>.<key>= overrides", key)
+					"unknown opt %q; calque understands config=, manifest=, quiet=, <section>.<key>= overrides, "+
+						"and the options protoc-gen-go takes", key)
 			}
 			p.Overrides[key] = value
 		}
 	}
 	return p, nil
+}
+
+// forProtogen reports whether an option belongs to protogen rather than to
+// calque.
+//
+// The Go target builds a protogen.Plugin from the same request, so it needs the
+// same flags protoc-gen-go was given -- `module=` decides where files land,
+// `default_api_level=` decides whether the emitted code says SetX or assigns a
+// field. Passing them through keeps calque's buf entry a copy of the
+// protoc-gen-go entry, which is the point: two entries that disagree would
+// generate code that does not compile, loudly, rather than code that compiles
+// and reads the wrong thing.
+func forProtogen(key string) bool {
+	switch key {
+	case "paths", "module", "annotate_code", "default_api_level":
+		return true
+	}
+	// M<file>=<import> and apilevelM<file>=<level> are per-file overrides.
+	return strings.HasPrefix(key, "M") || strings.HasPrefix(key, "apilevelM")
 }
 
 // ConfigPath is where the config is, or an error saying what to do about it.
