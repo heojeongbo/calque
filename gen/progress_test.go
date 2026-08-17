@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/HeoJeongBo/calque/gen"
+	"github.com/heojeongbo/calque/gen"
 )
 
 // TestProgressNeverWritesCarriageReturn is the one that matters.

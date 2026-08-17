@@ -8,8 +8,8 @@ import (
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	"github.com/HeoJeongBo/calque/gen"
-	"github.com/HeoJeongBo/calque/schema"
+	"github.com/heojeongbo/calque/gen"
+	"github.com/heojeongbo/calque/schema"
 )
 
 // The ent packages a schema type names.

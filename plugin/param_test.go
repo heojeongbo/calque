@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/HeoJeongBo/calque/plugin"
+	"github.com/heojeongbo/calque/plugin"
 )
 
 func TestParseParams(t *testing.T) {

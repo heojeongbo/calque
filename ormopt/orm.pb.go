@@ -91,7 +91,7 @@ const file_calque_orm_orm_proto_rawDesc = "" +
 	"calque.orm\x1a\x18calque/orm/options.proto\x1a google/protobuf/descriptor.proto:W\n" +
 	"\amessage\x12\x1f.google.protobuf.MessageOptions\x18\xc9\xdf\x02 \x01(\v2\x1a.calque.orm.MessageOptionsR\amessage:O\n" +
 	"\x05field\x12\x1d.google.protobuf.FieldOptions\x18\xad\xe0\x02 \x01(\v2\x18.calque.orm.FieldOptionsR\x05field:L\n" +
-	"\x04edge\x12\x1d.google.protobuf.FieldOptions\x18\xae\xe0\x02 \x01(\v2\x17.calque.orm.EdgeOptionsR\x04edgeB%Z#github.com/HeoJeongBo/calque/ormoptb\beditionsp\xe8\a"
+	"\x04edge\x12\x1d.google.protobuf.FieldOptions\x18\xae\xe0\x02 \x01(\v2\x17.calque.orm.EdgeOptionsR\x04edgeB%Z#github.com/heojeongbo/calque/ormoptb\beditionsp\xe8\a"
 
 var file_calque_orm_orm_proto_goTypes = []any{
 	(*descriptorpb.MessageOptions)(nil), // 0: google.protobuf.MessageOptions

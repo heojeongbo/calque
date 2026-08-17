@@ -13,7 +13,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/HeoJeongBo/calque/internal/entname"
+	"github.com/heojeongbo/calque/internal/entname"
 )
 
 func TestPascal(t *testing.T) {

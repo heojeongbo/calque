@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/HeoJeongBo/calque/gen"
+	"github.com/heojeongbo/calque/gen"
 )
 
 // nesting is a store that indexes a path into a nested object, like IndexedDB.

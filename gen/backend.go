@@ -3,7 +3,7 @@ package gen
 import (
 	"fmt"
 
-	"github.com/HeoJeongBo/calque/schema"
+	"github.com/heojeongbo/calque/schema"
 )
 
 // CodecName is the transform a value goes through on its way into and out of

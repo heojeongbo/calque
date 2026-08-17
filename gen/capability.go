@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/HeoJeongBo/calque/schema"
+	"github.com/heojeongbo/calque/schema"
 )
 
 // ShortfallKind names a way a backend can come up short, so that accepting one

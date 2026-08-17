@@ -5,8 +5,8 @@ import (
 
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	"github.com/HeoJeongBo/calque/ormopt"
-	"github.com/HeoJeongBo/calque/schema"
+	"github.com/heojeongbo/calque/ormopt"
+	"github.com/heojeongbo/calque/schema"
 )
 
 // typeOf maps an annotation type to a schema type.

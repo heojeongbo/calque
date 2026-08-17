@@ -6,8 +6,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	"github.com/HeoJeongBo/calque/ormopt"
-	"github.com/HeoJeongBo/calque/schema"
+	"github.com/heojeongbo/calque/ormopt"
+	"github.com/heojeongbo/calque/schema"
 )
 
 // isEntity reports whether a message opted in.

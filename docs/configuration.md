@@ -162,7 +162,7 @@ calque.yaml: nothing understands "dexei"
 
 ```yaml
 plugins:
-  - local: [go, run, github.com/HeoJeongBo/calque@latest]
+  - local: [go, run, github.com/heojeongbo/calque@latest]
     out: gen
     opt: [config=calque.yaml, quiet=true]
 ```

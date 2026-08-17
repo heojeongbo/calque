@@ -9,7 +9,7 @@ It is a protoc plugin. buf runs it; you do not.
 # buf.gen.yaml
 version: v2
 plugins:
-  - local: [go, run, github.com/HeoJeongBo/calque@latest]
+  - local: [go, run, github.com/heojeongbo/calque@latest]
     out: gen
     opt: [config=calque.yaml]
 ```

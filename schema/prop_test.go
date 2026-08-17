@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/HeoJeongBo/calque/schema"
+	"github.com/heojeongbo/calque/schema"
 )
 
 // TestFieldPresence pins the rules for a field. They are read by every target

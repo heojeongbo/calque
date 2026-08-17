@@ -63,7 +63,7 @@ anyone performs.
     out: src
 
 # after
-  - local: [go, run, github.com/HeoJeongBo/calque@latest]
+  - local: [go, run, github.com/heojeongbo/calque@latest]
     out: src
     opt: [config=calque.yaml]
 ```
@@ -98,7 +98,7 @@ change into the swap makes the diff unreadable.
 ### Go
 
 ```yaml
-  - local: [go, run, github.com/HeoJeongBo/calque@latest]
+  - local: [go, run, github.com/heojeongbo/calque@latest]
     out: gen
     opt: [config=calque.yaml, module=example.com/app, default_api_level=API_OPAQUE]
 ```

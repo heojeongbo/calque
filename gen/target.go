@@ -7,7 +7,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/pluginpb"
 
-	"github.com/HeoJeongBo/calque/schema"
+	"github.com/heojeongbo/calque/schema"
 )
 
 // Target is a language calque emits.

@@ -6,10 +6,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/HeoJeongBo/calque/gen"
-	"github.com/HeoJeongBo/calque/internal/protoc"
-	"github.com/HeoJeongBo/calque/ormcompat"
-	"github.com/HeoJeongBo/calque/schema"
+	"github.com/heojeongbo/calque/gen"
+	"github.com/heojeongbo/calque/internal/protoc"
+	"github.com/heojeongbo/calque/ormcompat"
+	"github.com/heojeongbo/calque/schema"
 )
 
 // fixtureSchema is the real apptest fixture, parsed the way production parses

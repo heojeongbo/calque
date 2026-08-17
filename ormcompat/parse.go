@@ -22,8 +22,8 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/pluginpb"
 
-	"github.com/HeoJeongBo/calque/ormopt"
-	"github.com/HeoJeongBo/calque/schema"
+	"github.com/heojeongbo/calque/ormopt"
+	"github.com/heojeongbo/calque/schema"
 )
 
 // Parse builds the schema described by a plugin request.

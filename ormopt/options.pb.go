@@ -1040,7 +1040,7 @@ const file_calque_orm_options_proto_rawDesc = "" +
 	"\timmutable\x18\b \x01(\bR\timmutable\x12\x18\n" +
 	"\adefault\x18\x10 \x01(\tR\adefault\"\x10\n" +
 	"\x0eVersionOptions\"\x0f\n" +
-	"\rErasedOptionsB%Z#github.com/HeoJeongBo/calque/ormoptb\beditionsp\xe8\a"
+	"\rErasedOptionsB%Z#github.com/heojeongbo/calque/ormoptb\beditionsp\xe8\a"
 
 var file_calque_orm_options_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_calque_orm_options_proto_goTypes = []any{

@@ -8,11 +8,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/HeoJeongBo/calque/backend/entsql"
-	"github.com/HeoJeongBo/calque/gen"
-	"github.com/HeoJeongBo/calque/internal/protoc"
-	"github.com/HeoJeongBo/calque/ormcompat"
-	gotarget "github.com/HeoJeongBo/calque/target/gotarget"
+	"github.com/heojeongbo/calque/backend/entsql"
+	"github.com/heojeongbo/calque/gen"
+	"github.com/heojeongbo/calque/internal/protoc"
+	"github.com/heojeongbo/calque/ormcompat"
+	gotarget "github.com/heojeongbo/calque/target/gotarget"
 )
 
 // TestReferenceSchemas generates ent schema types from a real proto tree and

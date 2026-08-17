@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/HeoJeongBo/calque/schema"
+	"github.com/heojeongbo/calque/schema"
 )
 
 // tenant and user are the shape everything downstream is exercised against: a

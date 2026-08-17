@@ -3,7 +3,7 @@ package query
 import (
 	"fmt"
 
-	"github.com/HeoJeongBo/calque/schema"
+	"github.com/heojeongbo/calque/schema"
 )
 
 // Derive builds every plan an entity's declared operations imply.

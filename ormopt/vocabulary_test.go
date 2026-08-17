@@ -7,8 +7,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 
-	"github.com/HeoJeongBo/calque/internal/protoc"
-	"github.com/HeoJeongBo/calque/ormopt"
+	"github.com/heojeongbo/calque/internal/protoc"
+	"github.com/heojeongbo/calque/ormopt"
 )
 
 // TestUpstreamVocabularyDecodes is the test the whole vendoring decision rests

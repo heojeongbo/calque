@@ -10,7 +10,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 
-	"github.com/HeoJeongBo/calque/internal/protoc"
+	"github.com/heojeongbo/calque/internal/protoc"
 )
 
 // TestVendoredMatchesUpstream compares proto/calque/orm against the real

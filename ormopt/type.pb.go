@@ -172,7 +172,7 @@ const file_calque_orm_type_proto_rawDesc = "" +
 	"\tTYPE_UINT\x10\x04\x12\r\n" +
 	"\tTYPE_UUID\x10@\x12\r\n" +
 	"\tTYPE_TIME\x10A\x12\r\n" +
-	"\tTYPE_JSON\x10B\x1a\x02\x10\x01B%Z#github.com/HeoJeongBo/calque/ormoptb\beditionsp\xe8\a"
+	"\tTYPE_JSON\x10B\x1a\x02\x10\x01B%Z#github.com/heojeongbo/calque/ormoptb\beditionsp\xe8\a"
 
 var file_calque_orm_type_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_calque_orm_type_proto_goTypes = []any{

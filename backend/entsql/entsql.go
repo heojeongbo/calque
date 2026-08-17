@@ -18,9 +18,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/HeoJeongBo/calque/gen"
-	"github.com/HeoJeongBo/calque/internal/entname"
-	"github.com/HeoJeongBo/calque/schema"
+	"github.com/heojeongbo/calque/gen"
+	"github.com/heojeongbo/calque/internal/entname"
+	"github.com/heojeongbo/calque/schema"
 )
 
 // Dialect is the SQL a generated client speaks. It changes what the store can

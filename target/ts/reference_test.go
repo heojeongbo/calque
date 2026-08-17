@@ -8,11 +8,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/HeoJeongBo/calque/backend/dexie"
-	"github.com/HeoJeongBo/calque/gen"
-	"github.com/HeoJeongBo/calque/internal/protoc"
-	"github.com/HeoJeongBo/calque/ormcompat"
-	"github.com/HeoJeongBo/calque/target/ts"
+	"github.com/heojeongbo/calque/backend/dexie"
+	"github.com/heojeongbo/calque/gen"
+	"github.com/heojeongbo/calque/internal/protoc"
+	"github.com/heojeongbo/calque/ormcompat"
+	"github.com/heojeongbo/calque/target/ts"
 )
 
 // TestReferenceOutput generates from a real proto tree and compares against

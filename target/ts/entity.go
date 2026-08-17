@@ -3,10 +3,10 @@ package ts
 import (
 	"fmt"
 
-	"github.com/HeoJeongBo/calque/backend/dexie"
-	"github.com/HeoJeongBo/calque/gen"
-	"github.com/HeoJeongBo/calque/internal/tsw"
-	"github.com/HeoJeongBo/calque/schema"
+	"github.com/heojeongbo/calque/backend/dexie"
+	"github.com/heojeongbo/calque/gen"
+	"github.com/heojeongbo/calque/internal/tsw"
+	"github.com/heojeongbo/calque/schema"
 )
 
 // emitEntity writes <entity>.db.g.ts.

@@ -294,7 +294,7 @@ const file_calque_orm_index_proto_rawDesc = "" +
 	"\timmutable\x18\b \x01(\bR\timmutable\x12\x16\n" +
 	"\x06hidden\x18\t \x01(\bR\x06hidden\x12'\n" +
 	"\x0fincludes_erased\x18\n" +
-	" \x01(\bR\x0eincludesErasedB%Z#github.com/HeoJeongBo/calque/ormoptb\beditionsp\xe8\a"
+	" \x01(\bR\x0eincludesErasedB%Z#github.com/heojeongbo/calque/ormoptb\beditionsp\xe8\a"
 
 var file_calque_orm_index_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_calque_orm_index_proto_goTypes = []any{

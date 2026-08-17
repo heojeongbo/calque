@@ -38,16 +38,16 @@
 		"indexeddb",
 		"codegen"
 	],
-	"author": "heojeongbo <heojungbo@gmail.com> (https://github.com/HeoJeongBo)",
+	"author": "heojeongbo <heojungbo@gmail.com> (https://github.com/heojeongbo)",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/HeoJeongBo/calque.git",
+		"url": "git+https://github.com/heojeongbo/calque.git",
 		"directory": "ts/packages/dexie"
 	},
-	"homepage": "https://github.com/HeoJeongBo/calque#readme",
+	"homepage": "https://github.com/heojeongbo/calque#readme",
 	"bugs": {
-		"url": "https://github.com/HeoJeongBo/calque/issues"
+		"url": "https://github.com/heojeongbo/calque/issues"
 	},
 	"publishConfig": {
 		"access": "public",

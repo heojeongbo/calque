@@ -9,8 +9,8 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/pluginpb"
 
-	"github.com/HeoJeongBo/calque/gen"
-	"github.com/HeoJeongBo/calque/ormcompat"
+	"github.com/heojeongbo/calque/gen"
+	"github.com/heojeongbo/calque/ormcompat"
 )
 
 // Serve reads a CodeGeneratorRequest, generates, and writes the response.

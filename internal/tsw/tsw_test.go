@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/HeoJeongBo/calque/internal/tsw"
+	"github.com/heojeongbo/calque/internal/tsw"
 )
 
 func TestPWritesLinesVerbatim(t *testing.T) {

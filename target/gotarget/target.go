@@ -23,9 +23,9 @@ import (
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	"github.com/HeoJeongBo/calque/backend/entsql"
-	"github.com/HeoJeongBo/calque/gen"
-	"github.com/HeoJeongBo/calque/schema"
+	"github.com/heojeongbo/calque/backend/entsql"
+	"github.com/heojeongbo/calque/gen"
+	"github.com/heojeongbo/calque/schema"
 )
 
 // Options is the `go:` config section.

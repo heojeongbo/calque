@@ -1,4 +1,4 @@
-module github.com/HeoJeongBo/calque
+module github.com/heojeongbo/calque
 
 go 1.26.3
 

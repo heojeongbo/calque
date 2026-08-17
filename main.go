@@ -4,7 +4,7 @@
 // It is a protoc plugin, so buf runs it rather than a person:
 //
 //	plugins:
-//	  - local: [go, run, github.com/HeoJeongBo/calque]
+//	  - local: [go, run, github.com/heojeongbo/calque]
 //	    out: gen
 //	    opt: [config=calque.yaml]
 //
@@ -18,12 +18,12 @@ package main
 import (
 	"os"
 
-	"github.com/HeoJeongBo/calque/backend/dexie"
-	"github.com/HeoJeongBo/calque/backend/entsql"
-	"github.com/HeoJeongBo/calque/gen"
-	"github.com/HeoJeongBo/calque/plugin"
-	"github.com/HeoJeongBo/calque/target/gotarget"
-	"github.com/HeoJeongBo/calque/target/ts"
+	"github.com/heojeongbo/calque/backend/dexie"
+	"github.com/heojeongbo/calque/backend/entsql"
+	"github.com/heojeongbo/calque/gen"
+	"github.com/heojeongbo/calque/plugin"
+	"github.com/heojeongbo/calque/target/gotarget"
+	"github.com/heojeongbo/calque/target/ts"
 )
 
 func main() { os.Exit(plugin.Serve(os.Stdin, os.Stdout, os.Stderr, registry())) }

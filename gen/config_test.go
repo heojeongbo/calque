@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/HeoJeongBo/calque/gen"
+	"github.com/heojeongbo/calque/gen"
 )
 
 func parse(t *testing.T, doc string) (*gen.Config, error) {

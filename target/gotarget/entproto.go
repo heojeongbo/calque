@@ -9,7 +9,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/gofeaturespb"
 
-	"github.com/HeoJeongBo/calque/schema"
+	"github.com/heojeongbo/calque/schema"
 )
 
 var timestamppbPkg = protogen.GoImportPath("google.golang.org/protobuf/types/known/timestamppb")

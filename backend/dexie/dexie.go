@@ -16,8 +16,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/HeoJeongBo/calque/gen"
-	"github.com/HeoJeongBo/calque/schema"
+	"github.com/heojeongbo/calque/gen"
+	"github.com/heojeongbo/calque/schema"
 )
 
 // Options is the `dexie:` config section.

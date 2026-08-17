@@ -22,7 +22,7 @@ plugins:
   - local: [protoc-gen-go]
     out: gen
     opt: [module=example.com/app, default_api_level=API_OPAQUE]
-  - local: [go, run, github.com/HeoJeongBo/calque@latest]
+  - local: [go, run, github.com/heojeongbo/calque@latest]
     out: gen
     opt: [config=calque.yaml, module=example.com/app, default_api_level=API_OPAQUE]
 ```

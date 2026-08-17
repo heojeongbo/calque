@@ -17,7 +17,7 @@
 // this seam now is nearly free and later is not.
 package query
 
-import "github.com/HeoJeongBo/calque/schema"
+import "github.com/heojeongbo/calque/schema"
 
 // Op is one storage operation.
 type Op string

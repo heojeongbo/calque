@@ -5,11 +5,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/HeoJeongBo/calque/backend/entsql"
-	"github.com/HeoJeongBo/calque/gen"
-	"github.com/HeoJeongBo/calque/internal/protoc"
-	"github.com/HeoJeongBo/calque/ormcompat"
-	"github.com/HeoJeongBo/calque/schema"
+	"github.com/heojeongbo/calque/backend/entsql"
+	"github.com/heojeongbo/calque/gen"
+	"github.com/heojeongbo/calque/internal/protoc"
+	"github.com/heojeongbo/calque/ormcompat"
+	"github.com/heojeongbo/calque/schema"
 )
 
 func parse(t *testing.T, file string) *schema.Schema {

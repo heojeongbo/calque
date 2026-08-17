@@ -17,10 +17,10 @@ import (
 
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	"github.com/HeoJeongBo/calque/backend/dexie"
-	"github.com/HeoJeongBo/calque/gen"
-	"github.com/HeoJeongBo/calque/internal/tsw"
-	"github.com/HeoJeongBo/calque/schema"
+	"github.com/heojeongbo/calque/backend/dexie"
+	"github.com/heojeongbo/calque/gen"
+	"github.com/heojeongbo/calque/internal/tsw"
+	"github.com/heojeongbo/calque/schema"
 )
 
 // Options is the `ts:` config section.

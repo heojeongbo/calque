@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/HeoJeongBo/calque/internal/protoc"
+	"github.com/heojeongbo/calque/internal/protoc"
 )
 
 // sources are the vendored annotation files, named as they are imported.
@@ -42,7 +42,7 @@ func run() error {
 	// is Has*: telling `unique: false` from an absent `unique` is the whole of
 	// the presence rules, and the open API spells that as a pointer field the
 	// caller can forget to check.
-	param := "module=github.com/HeoJeongBo/calque,default_api_level=API_OPAQUE"
+	param := "module=github.com/heojeongbo/calque,default_api_level=API_OPAQUE"
 
 	req, err := protoc.CompileRequest(ctx, []string{"proto"}, param, sources...)
 	if err != nil {

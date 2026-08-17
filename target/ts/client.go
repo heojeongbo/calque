@@ -5,9 +5,9 @@ import (
 
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	"github.com/HeoJeongBo/calque/gen"
-	"github.com/HeoJeongBo/calque/internal/tsw"
-	"github.com/HeoJeongBo/calque/schema"
+	"github.com/heojeongbo/calque/gen"
+	"github.com/heojeongbo/calque/internal/tsw"
+	"github.com/heojeongbo/calque/schema"
 )
 
 // emitClient writes client.g.ts: the per-service client types, the method bags,

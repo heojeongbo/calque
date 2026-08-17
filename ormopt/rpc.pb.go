@@ -333,7 +333,7 @@ const file_calque_orm_rpc_proto_rawDesc = "" +
 	"\bRpcPatch\x12\x1a\n" +
 	"\bdisabled\x18\x01 \x01(\bR\bdisabled\"&\n" +
 	"\bRpcErase\x12\x1a\n" +
-	"\bdisabled\x18\x01 \x01(\bR\bdisabledB%Z#github.com/HeoJeongBo/calque/ormoptb\beditionsp\xe8\a"
+	"\bdisabled\x18\x01 \x01(\bR\bdisabledB%Z#github.com/heojeongbo/calque/ormoptb\beditionsp\xe8\a"
 
 var file_calque_orm_rpc_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_calque_orm_rpc_proto_goTypes = []any{

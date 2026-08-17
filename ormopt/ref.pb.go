@@ -105,7 +105,7 @@ const file_calque_orm_ref_proto_rawDesc = "" +
 	"calque.orm\"?\n" +
 	"\x03Ref\x12\x19\n" +
 	"\x04name\x18\x01 \x01(\tB\x05\xaa\x01\x02\b\x02R\x04name\x12\x1d\n" +
-	"\x06number\x18\x02 \x01(\x05B\x05\xaa\x01\x02\b\x02R\x06numberB%Z#github.com/HeoJeongBo/calque/ormoptb\beditionsp\xe8\a"
+	"\x06number\x18\x02 \x01(\x05B\x05\xaa\x01\x02\b\x02R\x06numberB%Z#github.com/heojeongbo/calque/ormoptb\beditionsp\xe8\a"
 
 var file_calque_orm_ref_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_calque_orm_ref_proto_goTypes = []any{
