@@ -93,24 +93,44 @@ describe("TableBase over a real IndexedDB", () => {
 	});
 
 	/**
-	 * KNOWN BUG, pinned deliberately: `_reconcile` always resolves true, even
-	 * when the stored value was newer and nothing was written.
-	 *
-	 * The `false` returned inside the Dexie transaction is the callback's
-	 * result, not the method's, and it is discarded. The consuming application
-	 * reads this value and skips work when it is false — a branch that
-	 * therefore never runs.
-	 *
-	 * This test asserts the bug so that fixing it is a deliberate act with its
-	 * own diff, and so the fix cannot arrive as a side effect of something
-	 * else. See docs/conformance.md item 5. When it is fixed, this expectation
-	 * flips to `false` in the same commit.
+	 * conformance.md item 5, fixed in v0.2.0. Until then this resolved `true`
+	 * whatever happened, so a caller's `if (!ok)` branch never ran.
 	 */
-	it("reports success even when it did not write (conformance item 5)", async () => {
+	it("reports that it did not write", async () => {
 		await rows.put(row("a", "second", 2));
 
 		const applied = await rows.put(row("a", "first", 1));
-		expect(applied).toBe(true);
+		expect(applied).toBe(false);
 		expect((await rows.read("a")).name).toBe("second");
+	});
+
+	it("reports that it did write", async () => {
+		expect(await rows.put(row("a", "first", 1))).toBe(true);
+		expect(await rows.put(row("a", "second", 2))).toBe(true);
+	});
+
+	// Equal versions are not newer, so the write is declined. Otherwise two
+	// writers at the same version would each overwrite the other and the last
+	// one to arrive would win, which is the thing a version field exists to
+	// stop.
+	it("declines an equal version", async () => {
+		await rows.put(row("a", "first", 1));
+
+		expect(await rows.put(row("a", "second", 1))).toBe(false);
+		expect((await rows.read("a")).name).toBe("first");
+	});
+
+	// An unversioned table has nothing to compare, so every write lands and
+	// says so.
+	it("always writes when the table is not versioned", async () => {
+		const plain = new (class extends Rows {
+			protected override _versioned(): boolean {
+				return false;
+			}
+		})(db, RowSchema);
+
+		expect(await plain.put(row("a", "second", 2))).toBe(true);
+		expect(await plain.put(row("a", "first", 1))).toBe(true);
+		expect((await plain.read("a")).name).toBe("first");
 	});
 });

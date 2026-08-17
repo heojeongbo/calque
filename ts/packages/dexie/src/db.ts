@@ -109,21 +109,27 @@ export class TableBase<Desc extends DescMessage = DescMessage> {
 	}
 
 	/**
-	 * Write a value, keeping whichever of the two is newer.
+	 * Write a value, keeping whichever of the two is newer, and report which
+	 * one that was.
 	 *
-	 * KNOWN BUG, reproduced on purpose: this always resolves `true`. The
-	 * `false` returned inside the transaction is the callback's result, not
-	 * this method's, and it is discarded — so a caller that skips work when the
-	 * write did not land never skips it. The consuming application reads this
-	 * value:
+	 * `true` means this value is now what is stored; `false` means the stored
+	 * value was newer or the same and nothing was written. A caller that skips
+	 * work on `false` can rely on that.
+	 *
+	 * It did not used to. Until v0.2.0 this method resolved `true` no matter
+	 * what: the `false` returned inside the transaction was the callback's
+	 * result rather than the method's, and it was discarded. Reproducing that
+	 * was deliberate while the point was to be a drop-in — see
+	 * docs/conformance.md item 5 — but a caller writing
 	 *
 	 *     const ok = await table._reconcile(v);
-	 *     if (!ok) continue;   // never taken
+	 *     if (!ok) continue;
 	 *
-	 * See docs/conformance.md item 5. Fixing it makes that branch live for the
-	 * first time, which is a behaviour change and belongs in its own commit
-	 * with its own test run. `reconcileReportsOutcome` in the tests pins the
-	 * current behaviour so the fix cannot land by accident.
+	 * had a branch that never ran, and now does. That is the whole reason this
+	 * is a minor bump rather than a patch.
+	 *
+	 * The comparison and the write are in one transaction, so the answer is not
+	 * stale by the time it is returned.
 	 */
 	async _reconcile(v: V_<Desc>): Promise<boolean> {
 		const [k, data] = this._makeDehydrated(v);
@@ -133,16 +139,17 @@ export class TableBase<Desc extends DescMessage = DescMessage> {
 			return true;
 		}
 
-		await this._db.transaction("rw", this._table, async () => {
+		return this._db.transaction("rw", this._table, async () => {
 			const u = await this._table.get(k);
 			if (u === undefined) {
-				return this._table.put(data as E_<Desc>, k);
+				await this._table.put(data as E_<Desc>, k);
+				return true;
 			}
 			if (this._compare(u, v) >= 0) {
 				return false;
 			}
-			return this._table.put(data as E_<Desc>, k);
+			await this._table.put(data as E_<Desc>, k);
+			return true;
 		});
-		return true;
 	}
 }

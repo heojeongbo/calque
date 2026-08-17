@@ -119,8 +119,10 @@ go build ./... && go test ./...
 An empty `migrate/schema.go` diff means no column, index or foreign key moved,
 which is the thing you actually care about.
 
-Note that the Go target is not finished — it emits the ent schema and the
-`Proto()` conversion, not the server code. A full Go swap is not possible yet.
+The Go target replaces two plugins at once — `protoc-gen-orm-ent` and
+`protoc-gen-orm-go` — and those emitted files carrying two different generator
+names. `go.header` and `go.query_header` are what keep line 1 of each group
+unchanged.
 
 ## Stage 2: what to fix, and in what order
 
@@ -145,7 +147,7 @@ Each of these is a measured divergence from
 
 | | |
 |---|---|
-| `_reconcile` always returning true | callers that check its result have never taken the `false` branch. Fixing it means those branches start executing |
+| `_reconcile` always returning true | **fixed in `@heojeongbo/calque-dexie` v0.2.0.** Callers that check its result have never taken the `false` branch; upgrading makes those branches live for the first time |
 | edges embedded rather than referenced | changes what a row contains |
 
 ## Turning the warnings into errors

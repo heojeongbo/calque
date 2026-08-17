@@ -48,13 +48,12 @@ handle and the message descriptor, and provides:
 `_dehydrate` and `_hydrate` are abstract in effect — the base throws, and the
 generated subclass overrides both.
 
-> **`_reconcile` always resolves `true`.** The comparison it makes inside the
-> transaction is discarded, so a caller checking its result never takes the
-> `false` branch and a stale write reports as landed. This reproduces the
-> generator calque replaces, on purpose, so that adopting calque is a swap with
-> an empty diff. It is
-> [conformance item 5](https://github.com/heojeongbo/calque/blob/main/docs/conformance.md)
-> and it is open.
+> **`_reconcile` changed in v0.2.0.** It now returns whether it actually wrote:
+> `false` means the stored value was newer or the same and nothing happened.
+> Until v0.2.0 it resolved `true` whatever the comparison decided, so a caller
+> writing `if (!ok) continue` had a branch that never ran — and now does. That
+> is why this is a minor bump and not a patch. It was
+> [conformance item 5](https://github.com/heojeongbo/calque/blob/main/docs/conformance.md).
 
 ### Types
 

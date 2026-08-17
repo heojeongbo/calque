@@ -134,10 +134,13 @@ if (!ok) continue;      // never taken
 
 So one target refuses a stale write and the other believes every write landed.
 
-**calque:** `query.Plan.Guard` carries the version compare, the adapter contract
-requires it be evaluated inside the write, and the write returns an outcome the
-caller can act on. The conformance suite asserts that a stale write is refused
-by *every* backend.
+**calque:** the Go target implements the compare-and-swap, folded into the
+UPDATE so it is atomic without a transaction, and distinguishes "gone" from
+"someone got there first" with two error codes. On the TypeScript side
+`_reconcile` returns an outcome the caller can act on as of runtime v0.2.0 —
+the comparison and the write are in one transaction, so the answer is not stale
+by the time it is returned. `query.Plan.Guard` carries the same compare in the
+neutral IR, and is not yet read by either target.
 
 ## 6. Edges — reference, not copy
 

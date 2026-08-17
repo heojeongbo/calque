@@ -175,15 +175,17 @@ has.
 `_query`, `_insert`, `_reconcile`, `_compare`, `_clone`, plus the `_dehydrate`
 and `_hydrate` the generated subclass overrides.
 
-One thing to know: **`_reconcile` always resolves `true`.** The comparison it
-makes inside the transaction is discarded, so a stale write reports as landed.
-It is reproduced deliberately — that is conformance item 5 — and the consuming
-cache reads the answer:
+`_reconcile` reports whether it wrote. `false` means the stored value was newer
+or the same and nothing happened, so a cache written like this behaves:
 
 ```ts
 const ok = await table._reconcile(v)
-if (!ok) continue      // never taken
+if (!ok) continue      // taken, as of runtime v0.2.0
 ```
+
+It did not until v0.2.0: the comparison's result was discarded and the method
+always resolved `true`, which was conformance item 5. Upgrading a consumer that
+already had that branch makes it live for the first time.
 
 ## Configuration
 

@@ -1,6 +1,6 @@
 {
 	"name": "@heojeongbo/calque-dexie",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Dexie/IndexedDB backend runtime for calque-generated ORM code.",
 	"type": "module",
 	"sideEffects": false,
