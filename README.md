@@ -87,6 +87,7 @@ process, so there is no protoc and no buf in the test path.
 | [Configuration](docs/configuration.md) | `calque.yaml` and the plugin's `opt=` parameters, in full |
 | [Architecture](docs/architecture.md) | how a request becomes files, and why the seams are where they are |
 | [Extending](docs/extending.md) | adding a target language or a storage backend |
+| [Service target](docs/targets/service.md) | the `.proto` contract the other two read |
 | [TypeScript target](docs/targets/typescript.md) | what it emits and what it needs at runtime |
 | [Go target](docs/targets/go.md) | what it emits today, and what it does not yet |
 | [Migrating](docs/migrating.md) | coming from `protoc-gen-orm-ts` or `protoc-gen-orm-ent` |

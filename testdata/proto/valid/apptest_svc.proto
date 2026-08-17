@@ -1,15 +1,17 @@
 edition = "2023";
 
-// The service contract protoc-gen-orm-service would generate for apptest.
+// A service contract for apptest, hand-written.
 //
-// calque does not emit this — it is a different plugin's job and a different
-// repository's step — but the TypeScript target reads it: an entity with no
-// service produces no table, the Ref message's oneof decides what a lookup case
-// is called, and a method's response type decides how an entity is pulled out
-// of it.
+// calque's service target can generate one of these, and this is deliberately not
+// what it generates: it is small, it is 2-space indented, and its Select carries
+// only `all`. That is the point. The Go and TypeScript targets *read* a contract
+// rather than assuming one, so the fixture they read is a hand-written file that
+// exercises the shapes that matter — the ref oneof, a get, and a list whose
+// response wraps the entity in a field — and nothing more.
 //
-// Hand-written here, and deliberately small: the shapes that matter are the ref
-// oneof, a get, and a list whose response wraps the entity in a field.
+// Replacing this with real generated output would move the 70 goldens that read
+// it, and would stop testing that a hand-written contract works. The service
+// target's own goldens are separate, in target/service/testdata.
 package apptest;
 
 import "apptest.proto";

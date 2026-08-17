@@ -29,7 +29,7 @@ The silent ones are the ones to watch. An entity whose service is named anything
 other than `<Entity>Service` is modelled, validated, and then simply not served —
 no error, no output, nothing to notice.
 
-### The `<Entity>Ref` oneof: exactly one, name up to you — but it ends up in the output
+### The `Ref` oneof
 
 calque does not look this oneof up by name. It takes the message's **only** oneof,
 and a `Ref` carrying two is refused by the Go target and warned about by the
@@ -99,9 +99,11 @@ Two entities in one file is allowed and produces one output file containing both
 That works, and it means the output file is named after neither of them — which
 is why one-per-file is the convention.
 
-The service contract belongs in a sibling file. calque reads `<Entity>Ref`,
-`<Entity>Service` and the rest; it does not generate them. That is another
-plugin's job today.
+The service contract belongs in a sibling file, and calque can write it: the
+[service target](targets/service.md) emits `<Entity>Ref`, `<Entity>Service` and the
+four request messages from the same annotations. The other two targets read that
+file rather than assuming it, so a hand-written one works just as well — which is
+what the fixtures in `testdata/proto/valid` are.
 
 ## File preamble
 

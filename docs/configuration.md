@@ -62,6 +62,7 @@ entries claim the same output path, the error names both.
 |---|---|
 | `ts` | `dexie` |
 | `go` | `entsql` |
+| `service` | none — it is storeless |
 
 A pairing a target does not accept is refused before anything is configured,
 naming what it does accept. A target's runtime has adapters for specific stores;
