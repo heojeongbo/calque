@@ -115,6 +115,19 @@ builder and query emitter still disagree.
 is never computed. Putting one where another belongs does not compile, so this
 bug cannot be written a fourth time.
 
+**Fixed.** `dexie.compat: none` spells an index component the way the row
+carries it, and the deployment this was measured against has taken the Dexie
+version bump that changing a stored schema requires. Two indexes that had never
+matched a row now exist.
+
+Worth recording how nearly it was not fixed. The types stopped the bug being
+*computed* wrongly, and it survived anyway in the two places that never asked
+for a name at all — the primary key and an edge's target key were written
+straight from `.Name()`. Every key in the measured schema is `id`, where the two
+spellings coincide, so those two would have gone on being wrong for the first
+schema with a multi-word key. Distinct types catch a conversion; they do not
+catch not doing one.
+
 ## 5. Optimistic locking — the same version field, two different guarantees
 
 Go implements a genuine compare-and-swap, folded into the UPDATE so it is atomic

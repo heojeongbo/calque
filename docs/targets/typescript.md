@@ -126,21 +126,15 @@ still to reproduce it.
 
 ## `compat: orm-ts`
 
-The default. It reproduces `protoc-gen-orm-ts`, bugs included, so that adopting
-calque on an existing database is a swap with an empty diff.
+The default, and it changes exactly one thing: **how an index component is
+spelled.** Under `orm-ts` it uses the prop's proto name; a stored row is a
+protobuf-es message and carries the JSON name, so `&token_hash` is declared
+against rows whose property is `tokenHash` and the index matches nothing.
+IndexedDB declines to index an unresolvable key path rather than erroring, which
+is why this stays latent until someone queries it.
 
-What it reproduces:
-
-- **an index component spelled with the proto name** where the row carries the
-  JSON name. The store declares `&token_hash` and the query asks for
-  `{tokenHash}`. IndexedDB does not error on an unresolvable key path — it
-  declines to index the record — which is why it has been latent.
-- **a unique compound index emitted without `&`**, as above.
-- **`_dehydrate` writing an edge with no presence guard**, so an absent optional
-  edge throws while dehydrating.
-
-Each one warns on stderr every time it is generated, naming the entity and the
-prop and what to do:
+It warns on stderr every time it generates, naming the entity, the prop, and
+what to do:
 
 ```
 calque: apptest.User: index component "token_hash" is stored as "tokenHash"; the index is
@@ -149,8 +143,40 @@ declared under a name no row has, so it is never used
 	it — that changes the stored schema and needs a Dexie version bump.
 ```
 
-`compat: none` fixes all of them and makes the backend strict, so a capability
-shortfall stops the build instead of warning.
+Two other reproduced bugs are often lumped in with this and are **not** gated on
+`compat` — they happen either way, because the target does not read the setting:
+
+- **a unique compound index is emitted without `&`.** Dexie has no unique form
+  of one, so there is nothing else to emit. What `compat` decides is whether
+  that stops the build (below), not what the string says.
+- **`_dehydrate` writes an edge with no presence guard**, so an absent optional
+  edge throws while dehydrating. Unconditional.
+
+### `compat: none`, and `accept`
+
+`compat: none` fixes the spelling. It also makes the backend strict, which on
+any existing schema is the harder half: every constraint the store cannot hold
+becomes an error rather than a warning, and a schema with one unique compound
+index generates nothing at all.
+
+`accept` names the shortfalls to keep warning about instead of refusing:
+
+```yaml
+dexie:
+  compat: none
+  accept:
+    - unique_compound_index   # SQL holds it; a browser cache cannot mirror it
+    - binary_key
+```
+
+A list rather than a boolean, because a boolean also accepts the next shortfall,
+of some other kind, that nobody has looked at. The kinds are
+`unique_compound_index`, `partial_index`, `index_arity`,
+`unorderable_index_member`, `binary_key`, `no_transactions`; a name that is not
+one of them fails, listing the ones that are.
+
+**Changing the spelling changes the stored schema**, so it needs a Dexie version
+bump — and a Dexie version cannot be lowered. See [Migrating](../migrating.md).
 
 ## Runtime
 
@@ -201,13 +227,16 @@ Emitting what is wanted removes the post-pass.
 
 ## Known gaps
 
-Both are conformance items and both are open.
-
 - **Only `get` is emitted**, even from `rpc: {crud: true}`. `add`, `patch` and
   `erase` are not. The class says `implements Partial<UserServiceClient>`, which
   is a way of saying "some methods are missing" that no compiler complains
   about.
-- **There are no tests for the generated TypeScript.** No `fake-indexeddb`, no
-  Dexie test, nothing exercising a table. The runtime packages have tests; what
-  the generator emits is verified by byte-comparison against a generator that
-  also has none.
+  (conformance item 2, open)
+- **There are no tests for the generated TypeScript.** The runtime packages have
+  them — `TableBase` is exercised against a real IndexedDB through
+  `fake-indexeddb` — but nothing runs a *generated* table. What the generator
+  emits is verified by byte-comparison against a generator that also had no
+  tests.
+- **`_dehydrate` writes an edge with no presence guard**, so an absent optional
+  edge throws while dehydrating. Not gated on `compat`; it happens either way
+  (conformance item 6, open).

@@ -73,6 +73,26 @@ Whether a capability shortfall stops generation. `true` for a store meant to
 hold what the schema says. `false` only while reproducing an older generator, and
 then temporarily; see [Migrating](migrating.md).
 
+### `Accepts` — optional, and per kind
+
+`Strict` is all-or-nothing, which is too coarse for a store that is a cache: a
+unique compound index the store of record enforces is a real constraint, and a
+backend that cannot mirror it should be able to say so forever without also
+accepting the next shortfall of some other kind.
+
+```go
+func (b *Backend) Accepts(kind gen.ShortfallKind) bool
+```
+
+Implement it and `gen.Run` asks per kind instead of consulting `Strict`. Do not
+implement it and nothing changes. It is not on `gen.Backend` for the same reason
+`EntIdent` is not: a store with no opinion should not have to answer.
+
+The kinds are `unique_compound_index`, `partial_index`, `index_arity`,
+`unorderable_index_member`, `binary_key` and `no_transactions`
+(`gen.AllShortfallKinds`). An accepted shortfall is still reported on stderr on
+every build.
+
 ### `Configure`
 
 ```go

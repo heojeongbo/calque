@@ -141,7 +141,27 @@ Each of these is a measured divergence from
 | | |
 |---|---|
 | index spellings | `dexie.compat: none`. The index that was declared under a name no row has starts working |
-| unique compound indexes | `compat: none` refuses them rather than creating a non-unique index. Either drop `unique`, or move that entity to a store that holds it |
+| unique compound indexes | `compat: none` refuses them rather than creating a non-unique index. Accept `unique_compound_index` if another store holds the constraint and this one is a cache; dropping `unique` would delete it from the store that does hold it |
+
+Plan the rollback *first*, because a Dexie version cannot be lowered and there
+is probably nothing in the app that can recover from `VersionError`. If the
+cache is write-through, discarding it is cheap enough to be the recovery:
+
+```ts
+database.version(4).stores({ ...schemas() });
+
+database.open().catch("VersionError", async () => {
+	await database.delete();
+	await database.open();
+});
+```
+
+Add that *before* the bump, or in the same change, and the bump stops being
+one-way.
+
+An upgrade function is usually not needed for this particular fix: the rows
+already carry the property names the new indexes name, so the store fills them
+from what is there.
 
 **Needs a code change, not just a regeneration:**
 

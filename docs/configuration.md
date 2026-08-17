@@ -93,13 +93,33 @@ The Go target also needs the flags protoc-gen-go was given; see
 
 | key | default | values | |
 |---|---|---|---|
-| `compat` | `orm-ts` | `orm-ts`, `none` | reproduce `protoc-gen-orm-ts` bug for bug, or spell things correctly |
+| `compat` | `orm-ts` | `orm-ts`, `none` | how an index component is spelled: the prop's proto name, or the name a row actually carries |
+| `accept` | | shortfall kinds | capability shortfalls to warn about rather than refuse |
 
-`compat` also decides whether a capability shortfall stops the build. Under
-`orm-ts` it is a warning on stderr; under `none` it is an error. That is not two
-settings sharing a switch — a generator reproducing an older one has to keep
-generating, or adopting calque on an existing schema would produce nothing at
-all. See [Migrating](migrating.md).
+`compat` also decides the default policy: under `orm-ts` a capability shortfall
+is a warning on stderr, under `none` it is an error. A generator reproducing an
+older one has to keep generating, or adopting calque on an existing schema would
+produce nothing at all.
+
+`accept` separates the two, which any real migration needs — fixing the spelling
+and refusing what the store cannot hold are different decisions, and a schema
+whose unique compound indexes are enforced by SQL should not have to drop them
+to make a browser cache generate:
+
+```yaml
+dexie:
+  compat: none
+  accept:
+    - unique_compound_index
+    - binary_key
+```
+
+An accepted shortfall still warns on every build. The kinds are
+`unique_compound_index`, `partial_index`, `index_arity`,
+`unorderable_index_member`, `binary_key`, `no_transactions`, and a name that is
+not one of them fails listing the ones that are. It is a list rather than a
+boolean so that accepting one kind does not accept the next kind nobody has
+looked at. See [Migrating](migrating.md).
 
 ### `entsql:`
 
