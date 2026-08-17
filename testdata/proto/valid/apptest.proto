@@ -4,9 +4,9 @@ edition = "2023";
 //
 // It is deliberately the shape of a real schema: User has a uuid key, a
 // required edge, a nullable edge, a map, a version field, and a unique index
-// spanning a field and an edge -- which is the same "slug" index that
-// hday.oasys.Robot declares in production, and the one a document store cannot
-// enforce while a relational one can.
+// spanning a field and an edge -- which is the shape the deployment this was
+// measured against uses for most of its entities, and the one a document store
+// cannot enforce while a relational one can.
 package apptest;
 
 import "google/protobuf/timestamp.proto";

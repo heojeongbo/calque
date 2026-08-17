@@ -28,7 +28,8 @@ func (t *Target) emitClient(g *gen.Generator, p *pkg) ([]byte, error) {
 	f.P()
 
 	// The blank lines are unconditional. A package with no services still gets
-	// all of them, which is why hday/common/client.g.ts has three in a row --
+	// all of them, which is why a package with no entities ends up with three
+	// blank lines in a row --
 	// and a diff is a diff.
 	for _, svc := range services {
 		f.P(`import { `, svc.Name(), ` } from "./`, pbModule(svc.ParentFile().Path()), t.opts.ImportExtension, `";`)

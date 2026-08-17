@@ -83,6 +83,7 @@ process, so there is no protoc and no buf in the test path.
 | | |
 |---|---|
 | [Annotations](docs/annotations.md) | what you write in a `.proto`, what is inferred when you write nothing, and every validation error |
+| [Proto conventions](docs/conventions.md) | how to lay a proto tree out — the names calque looks up, and which ones fail quietly |
 | [Configuration](docs/configuration.md) | `calque.yaml` and the plugin's `opt=` parameters, in full |
 | [Architecture](docs/architecture.md) | how a request becomes files, and why the seams are where they are |
 | [Extending](docs/extending.md) | adding a target language or a storage backend |

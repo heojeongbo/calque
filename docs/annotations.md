@@ -3,6 +3,9 @@
 What you write in a `.proto` to describe a schema, what calque infers when you
 write nothing, and what it refuses.
 
+This is the vocabulary. For the shape — file layout, the message names calque
+looks up, the patch companions — see [Proto conventions](conventions.md).
+
 The vocabulary is [`buf.build/orm/orm`](https://buf.build/orm/orm)'s. calque
 carries its own copy under `proto/calque/orm/`, in package `calque.orm`, with
 the same extension numbers — and extensions resolve by number, so your files

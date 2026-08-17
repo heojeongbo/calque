@@ -11,7 +11,7 @@ import (
 // tenant and user are the shape everything downstream is exercised against: a
 // uuid key, a unique field, an edge, and a unique index that spans a field and
 // an edge. It is deliberately the shape of the production schema this was
-// measured against -- hday.oasys.Robot has exactly this "slug" index -- because
+// measured against -- most of its entities carry exactly this "slug" index -- because
 // that index is the one a document store cannot enforce and a relational one
 // can.
 func fixture(t *testing.T) *schema.Schema {

@@ -25,7 +25,7 @@ import (
 // is unset, so this repository never carries anybody else's data model and CI
 // does not need one:
 //
-//	CALQUE_REFERENCE_PROTO=~/path/to/interfaces/oasys/proto go test ./ormcompat/
+//	CALQUE_REFERENCE_PROTO=~/path/to/your/proto go test ./ormcompat/
 //
 // It asserts shape rather than specifics -- how many entities, that each has a
 // key, that every prop has a type and both names -- because the schema it reads
