@@ -213,12 +213,6 @@ prop has a `<field>_null` companion in the patch request:
 
 ## Known gaps
 
-- **`XGetKey` is emitted with the entity's own `patch`, not with the entities
-  that call it.** A caller is always some other entity's `Add` or `Patch`
-  resolving an edge, so an entity that is an edge target and declares only
-  `get` would be referenced by a function nobody generated. Nothing in the
-  measured schema is in that position, and the condition is reproduced rather
-  than the intent — so the trap is still there.
 - **`Erase` returns `(nil, nil)`** — a nil pointer where the signature promises
   a message. grpc marshals it as an empty message; a caller dereferencing it
   does not survive.

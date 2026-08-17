@@ -39,15 +39,17 @@ does the reverse. The table is reproduced in
 
 ### Golden output
 
-`target/ts/golden_test.go` compiles the valid corpus and compares byte for byte
-against `target/ts/testdata/golden/`.
+`target/ts/golden_test.go` and `target/gotarget/golden_test.go` compile the valid
+corpus and compare byte for byte against `testdata/golden/` beside each.
 
 ```sh
-UPDATE_GOLDEN=1 go test ./target/ts/
+UPDATE_GOLDEN=1 go test ./target/...
 ```
 
 Read the diff before committing it. The whole value of a golden test is that it
-notices things you did not mean.
+notices things you did not mean — the Go one found two bugs the first time it
+ran, both conditions that happened to be equivalent on the private tree the
+reference test reads.
 
 ### Policy tests
 
@@ -99,12 +101,18 @@ Nothing is copied in. `ormcompat/reference_test.go` checks that the annotations
 parse; `target/ts/reference_test.go` and `target/gotarget/reference_test.go`
 check that the output is byte-identical.
 
-This is where the interesting bugs came from. A fixture cannot tell you that
-services are ordered by dependency rather than by path, that `queries` is in
-service order while `db.g.ts` is in entity order, that an `rpc` entry is four
-lines rather than one, or that Go output is per proto file rather than per
+This is where several of the interesting bugs came from. A fixture cannot tell
+you that services are ordered by dependency rather than by path, that `queries`
+is in service order while `db.g.ts` is in entity order, that an `rpc` entry is
+four lines rather than one, or that Go output is per proto file rather than per
 entity — all four were found by pointing the generator at a tree that had 13
 entities in 13 files and comparing.
+
+The goldens catch the opposite kind. A real tree is uniform in ways a fixture
+does not have to be, and a condition that is equivalent on it stays wrong
+quietly: every entity there has a service and every edge target declares
+`patch`, so two conditions that are not the same condition looked like they
+were. Run both.
 
 ## Layout
 
