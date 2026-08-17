@@ -97,6 +97,9 @@ func (e *emitter) emitSchemas() ([]gen.File, error) {
 	if err := e.emitStore(); err != nil {
 		return nil, err
 	}
+	if err := e.emitBare(); err != nil {
+		return nil, err
+	}
 
 	// protogen owns the response, so the files come back through it rather
 	// than being returned directly. Everything it produced this run is ours:
