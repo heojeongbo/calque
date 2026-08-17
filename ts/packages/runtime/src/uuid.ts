@@ -27,10 +27,18 @@ export function u8_str(v?: Uint8Array): string | undefined {
 /**
  * Parse a UUID string into a 16-byte Uint8Array.
  *
- * Any non-hex character is stripped first, so the standard spellings all work:
- * `550e8400-e29b-41d4-a716-446655440000`, `{...}`, `urn:uuid:...`. Exactly 32
- * hex characters must remain; anything else returns `undefined` rather than a
- * partial key.
+ * Any non-hex character is stripped first, so the hyphenated form and the
+ * braced form both work: `550e8400-e29b-41d4-a716-446655440000` and `{...}`.
+ * Exactly 32 hex characters must remain; anything else returns `undefined`
+ * rather than a partial key.
+ *
+ * `urn:uuid:...` does **not** work, and the failure is silent. The prefix
+ * contributes a `d`, which survives the strip, so 33 characters remain and the
+ * `slice(0, 32)` takes the wrong 32 -- every byte shifted by a nibble. The
+ * result is a plausible uuid rather than `undefined`, which is the worst of the
+ * three outcomes. It is reproduced here rather than fixed, because it is what
+ * the generator this replaces does; the fix is to strip the prefix before
+ * stripping non-hex characters. See uuid.test.ts, which pins the behaviour.
  */
 export function str_u8(v?: string): Uint8Array | undefined {
 	if (!v) return undefined;

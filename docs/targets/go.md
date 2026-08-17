@@ -1,0 +1,176 @@
+# The Go target
+
+Emits [ent](https://entgo.io) schemas and the code around them, over SQL.
+
+```yaml
+targets:
+  - {target: go, backend: entsql, out: go}
+```
+
+**Status: partial.** The ent schema and the conversion out of it are done and
+byte-identical to the generator they replace — 26 of 26 files against a real
+proto tree. The server and query code is not written yet; see
+[What is not emitted yet](#what-is-not-emitted-yet).
+
+## Setup
+
+This target needs the same flags protoc-gen-go was given, because it builds its
+view of Go names from the same parameter string:
+
+```yaml
+plugins:
+  - local: [protoc-gen-go]
+    out: gen
+    opt: [module=example.com/app, default_api_level=API_OPAQUE]
+  - local: [go, run, github.com/HeoJeongBo/calque@latest]
+    out: gen
+    opt: [config=calque.yaml, module=example.com/app, default_api_level=API_OPAQUE]
+```
+
+Two requirements follow:
+
+- **Every file in the closure needs a `go_package`.** That is protogen's rule,
+  not calque's, and it is why only this target uses protogen.
+- **`default_api_level=API_OPAQUE`.** calque emits the opaque form — `SetX`,
+  `X_builder`. Under the open API those methods do not exist, so the emitted
+  code would fail to compile against a method that was never generated. calque
+  refuses up front instead, naming the flag.
+
+## What it emits
+
+Per proto file, not per entity — `pose_preset.proto` produces `pose_preset.go`,
+whatever the entities inside are called.
+
+| file | |
+|---|---|
+| `<pkg>/schema/<protofile>.go` | the ent schema types |
+| `<pkg>/ent/<protofile>.g.go` | `func (e *X) Proto() *pb.X` |
+
+The conversion helpers have to live in the ent package, because they are methods
+on ent's own generated types.
+
+### The ent schema
+
+```go
+func (PosePreset) Fields() []ent.Field {
+	return []ent.Field{
+		field.UUID("id", uuid.UUID{}).
+			Unique().
+			Immutable(),
+		field.String("name").
+			Optional(),
+		field.JSON("joints", map[string]float32{}).
+			Optional(),
+		field.Time("date_created").
+			Immutable().
+			Optional(),
+	}
+}
+
+func (PosePreset) Edges() []ent.Edge {
+	return []ent.Edge{
+		edge.To("holder", Holder.Type).
+			Unique().
+			Required().
+			Immutable(),
+	}
+}
+```
+
+Getting these right pins every column, index and foreign key in the physical
+database, because ent expands them into the rest. Which is also why it is
+checkable on its own, before a line of server code exists: run `ent generate`
+and diff `migrate/schema.go`.
+
+Three details that look like they could be improved and cannot:
+
+- **A default becomes `.Optional()`, not `.Default(...)`.** Changing it would
+  make every column with a default `NOT NULL`.
+- **`entsql.Annotation{Table: ...}` is always emitted**, with the entity name
+  lower-cased whole. ent's own default is a snake-cased plural — `pose_presets`
+  — so without the annotation the physical table renames itself.
+- **An index is `.Fields(...).Edges(...)`**, fields first, whatever order they
+  were declared in. That is ent's API, not a sort.
+
+### `Proto()`
+
+```go
+func (e *PosePreset) Proto() *oas.PosePreset {
+	x := &oas.PosePreset{}
+	x.SetId(e.ID[:])
+	if v := e.Edges.Holder; v != nil {
+		x.SetHolder(v.Proto())
+	}
+	x.SetName(e.Name)
+	x.SetJoints(e.Joints)
+	x.SetDateCreated(timestamppb.New(e.DateCreated))
+	return x
+}
+```
+
+One direction only. The reverse is written out field by field inside `Add` and
+`Patch`, because those have to tell a value that was supplied from one that was
+not, and a function taking a whole entity cannot.
+
+Four shapes, each for a reason:
+
+| | |
+|---|---|
+| an edge | checked for nil — it is loaded separately and is only there when the query asked for it |
+| a `json` column typed by a message | checked for nil — its Go type is a pointer regardless of what the schema said |
+| a nullable field | dereferenced |
+| a uuid key | sliced — ent holds an array, the proto field is bytes |
+
+## Two naming systems
+
+This is the sharpest thing about the target. ent and protoc-gen-go disagree
+about the same field, and they disagree exactly on initialisms:
+
+| the proto says | ent calls it | protoc-gen-go calls it |
+|---|---|---|
+| `id` | `ID` | `Id` |
+| `device_id` | `DeviceID` | `DeviceId` |
+| `trace_id` | `TraceID` | `TraceId` |
+| `name` | `Name` | `Name` |
+
+So every generated line spells the field twice, from two different sources:
+`internal/entname` for the ent side, protogen for the proto side. A hand-written
+mapping would be right on most fields and wrong on exactly the ones with an
+initialism in them.
+
+`internal/entname` is a copy of ent's acronym list. A test parses ent's own
+`func.go` out of the module cache and fails if the two have drifted, so the copy
+cannot quietly go stale.
+
+## Configuration
+
+| key | default | |
+|---|---|---|
+| `schema_dir` | `schema` | where ent schema types go, under the proto's Go package |
+| `ent_dir` | `ent` | where conversion helpers go |
+| `header` | `// Code generated by calque. DO NOT EDIT.` | first line of every file |
+
+And on the backend:
+
+| key | default | values |
+|---|---|---|
+| `dialect` | `sqlite` | `sqlite`, `postgres`, `mysql` |
+| `table` | | entity full name to physical table name |
+
+`dialect` is a capability question. MySQL has no partial index, so an entity that
+erases softly cannot have a unique index covering only its live rows, and calque
+will say so rather than create one that also covers the erased. Postgres caps a
+compound index at 32 members.
+
+## What is not emitted yet
+
+Roughly three quarters of the Go pipeline:
+
+| | |
+|---|---|
+| `<pkg>/query.g.go`, `<pkg>/store.g.go` | `Ref()`, `Picks()`, `XById`, `WithSelect`, and the server and client wiring |
+| `<pkg>/server/bare/*.g.go` | `XPick`, `XGetKey`, `XSelect*`, and `Get`, `Add`, `Patch`, `Erase` |
+
+Until those land, this target generates the schema and the conversion and
+nothing else — which is useful on its own, since it is what decides the shape of
+the database, but it is not a replacement for a full ORM generator yet.
