@@ -127,6 +127,7 @@ were. Run both.
 | `backend/dexie/`, `backend/entsql/` | storage decisions |
 | `target/ts/`, `target/gotarget/` | emission |
 | `internal/tsw/` | a forty-line line writer |
+| `internal/prow/` | the same, for `.proto`, plus a depth |
 | `internal/entname/` | ent's casing, copied and pinned |
 | `internal/protoc/` | in-process proto compilation, for tests |
 | `plugin/` | the protoc-plugin boundary |
