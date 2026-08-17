@@ -9,6 +9,7 @@ package gen
 import (
 	"fmt"
 	"path"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -40,6 +41,22 @@ type Config struct {
 	extra map[string]ast.Node
 	// claimed marks extra sections something has decoded.
 	claimed map[string]bool
+	// overrides are settings from the command line, keyed by section. They are
+	// applied on top of the file, per section, when it is claimed.
+	overrides map[string][]override
+}
+
+// override is one `<section>.<key>=<value>` from the plugin's option string.
+type override struct {
+	// path is the key inside the section, split on dots: `table.apptest.User`
+	// is {"table", "apptest", "User"}.
+	path []string
+	// value is the text as written. It is read as a yaml scalar, so `2` is a
+	// number and `true` is a boolean, and anything yaml cannot read is a
+	// string -- which is what makes `ts.runtime=@scope/pkg` work.
+	value string
+	// opt is the whole thing as the user typed it, for diagnostics.
+	opt string
 }
 
 // TargetConfig is one thing to generate.
@@ -59,8 +76,13 @@ type TargetConfig struct {
 	// discarded.
 	Out string `yaml:"out"`
 
-	// Name disambiguates two entries with the same target, and is the key for
-	// per-instance option sections. It defaults to Target.
+	// Name disambiguates two entries with the same target. It defaults to
+	// Target.
+	//
+	// It is a label, not a section key: options are claimed under the target's
+	// own name, so two entries running the same target read the same section.
+	// Naming them apart is for diagnostics and for saying which one emitted a
+	// file, not for configuring them differently.
 	Name string `yaml:"name"`
 }
 
@@ -99,9 +121,10 @@ func ParseConfig(b []byte, name string) (*Config, error) {
 	}
 
 	c := Config{
-		path:    name,
-		extra:   map[string]ast.Node{},
-		claimed: map[string]bool{},
+		path:      name,
+		extra:     map[string]ast.Node{},
+		claimed:   map[string]bool{},
+		overrides: map[string][]override{},
 	}
 
 	// Duplicate keys, core or extension, are a parse error: goccy rejects them
@@ -148,8 +171,19 @@ func (c *Config) validate() error {
 		if t.Target == "" {
 			return fmt.Errorf("%s: `target` is required (a registered target name)", where)
 		}
+		if err := checkName(t.Target); err != nil {
+			return fmt.Errorf("%s: target: %w", where, err)
+		}
 		if t.Backend == "" {
 			return fmt.Errorf("%s(%s): `backend` is required (a registered backend name)", where, t.Target)
+		}
+		if err := checkName(t.Backend); err != nil {
+			return fmt.Errorf("%s(%s): backend: %w", where, t.Target, err)
+		}
+		if t.Name != "" {
+			if err := checkName(t.Name); err != nil {
+				return fmt.Errorf("%s(%s): name: %w", where, t.Target, err)
+			}
 		}
 		if err := checkOut(t.Out); err != nil {
 			return fmt.Errorf("%s(%s): out: %w", where, t.Label(), err)
@@ -161,6 +195,22 @@ func (c *Config) validate() error {
 				c.path, prev, i, label)
 		}
 		seen[label] = i
+	}
+	return nil
+}
+
+// nameRE is the spelling a target, backend or label may have.
+//
+// It is here so that the json schema and this validator agree. The schema
+// declared the pattern from the start and the code did not check it, which meant
+// `target: TS` was a schema violation an editor flagged and a build did not --
+// it failed later with "no target named" and never said the name was the
+// problem.
+var nameRE = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+
+func checkName(name string) error {
+	if !nameRE.MatchString(name) {
+		return fmt.Errorf("%q is not a name; it must be lowercase, start with a letter, and hold only letters, digits and dashes", name)
 	}
 	return nil
 }
@@ -188,29 +238,107 @@ func checkOut(out string) error {
 // Path is the file this config came from.
 func (c *Config) Path() string { return c.path }
 
+// Override records a `<section>.<key>=<value>` setting from the command line,
+// to be applied on top of the file when that section is claimed.
+//
+// It is applied at claim time rather than now because the file's own section is
+// decoded first: an override is meant to win over what the file said, and there
+// is nothing to win over until a target or backend asks for it. A section
+// nobody claims is still reported, so `dexei.compat=none` names the mistake
+// instead of doing nothing.
+func (c *Config) Override(path, value string) error {
+	parts := strings.Split(path, ".")
+	if len(parts) < 2 {
+		return fmt.Errorf("opt %s=%s: an override is <section>.<key>=<value>", path, value)
+	}
+	for _, part := range parts {
+		if part == "" {
+			return fmt.Errorf("opt %s=%s: an override has an empty key", path, value)
+		}
+	}
+	section := parts[0]
+	c.overrides[section] = append(c.overrides[section], override{
+		path:  parts[1:],
+		value: value,
+		opt:   path + "=" + value,
+	})
+	return nil
+}
+
 // Section strictly decodes the top-level extension section key into v and marks
-// it claimed; ok is false when the config has no such section.
+// it claimed; ok is false when neither the config nor the command line said
+// anything about it.
 //
 // A target or backend calls this for its own options. Decoding strictly is what
 // makes a typo inside the section loud; UnclaimedSections is what makes a typo
 // in the section *name* loud.
 func (c *Config) Section(key string, v any) (ok bool, err error) {
 	node, found := c.extra[key]
-	if !found {
+	overrides := c.overrides[key]
+	if !found && len(overrides) == 0 {
 		return false, nil
 	}
 	c.claimed[key] = true
-	if err := yaml.NodeToValue(node, v, yaml.Strict()); err != nil {
-		return true, fmt.Errorf("%s: %s: %w", c.path, key, err)
+
+	if found {
+		if err := yaml.NodeToValue(node, v, yaml.Strict()); err != nil {
+			return true, fmt.Errorf("%s: %s: %w", c.path, key, err)
+		}
+	}
+
+	// One at a time, so a bad key is reported as the option the user typed
+	// rather than as a line in a document they never wrote.
+	for _, o := range overrides {
+		doc, err := o.document()
+		if err != nil {
+			return true, fmt.Errorf("opt %s: %w", o.opt, err)
+		}
+		if err := yaml.UnmarshalWithOptions(doc, v, yaml.Strict()); err != nil {
+			return true, fmt.Errorf("opt %s: %w", o.opt, err)
+		}
 	}
 	return true, nil
 }
 
-// UnclaimedSections is the unknown top-level sections nothing claimed, sorted.
+// document renders an override as the fragment of the section it stands for, so
+// that applying it is the same decode the file gets rather than a second way to
+// set a field.
+func (o override) document() ([]byte, error) {
+	var v any = scalar(o.value)
+	for i := len(o.path) - 1; i >= 0; i-- {
+		v = map[string]any{o.path[i]: v}
+	}
+	return yaml.Marshal(v)
+}
+
+// scalar reads an option's value the way the same text in the config file would
+// be read, so `quiet: true` and `x.quiet=true` mean one thing.
+//
+// Text yaml cannot read is the text itself. That is not a fallback so much as
+// the common case: `ts.runtime=@scope/pkg` starts with a character yaml
+// reserves, and the user is plainly naming a package.
+func scalar(raw string) any {
+	var v any
+	if err := yaml.Unmarshal([]byte(raw), &v); err == nil && v != nil {
+		return v
+	}
+	return raw
+}
+
+// UnclaimedSections is the sections nothing claimed, from the file or from the
+// command line, sorted.
 func (c *Config) UnclaimedSections() []string {
+	seen := map[string]bool{}
 	var out []string
 	for key := range c.extra {
-		if !c.claimed[key] {
+		if !c.claimed[key] && !seen[key] {
+			seen[key] = true
+			out = append(out, key)
+		}
+	}
+	for key := range c.overrides {
+		if !c.claimed[key] && !seen[key] {
+			seen[key] = true
 			out = append(out, key)
 		}
 	}

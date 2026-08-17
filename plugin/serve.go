@@ -81,6 +81,16 @@ func generate(req *pluginpb.CodeGeneratorRequest, r *gen.Registry, stderr io.Wri
 		return fail("%v", err)
 	}
 
+	// Command line over file. A `<section>.<key>=` opt is how a build varies one
+	// setting without a second config, and it is applied here rather than by the
+	// config parser because the parser is also used by tests that never saw an
+	// option string.
+	for _, key := range params.OverrideKeys() {
+		if err := cfg.Override(key, params.Overrides[key]); err != nil {
+			return fail("%v", err)
+		}
+	}
+
 	s, files, err := ormcompat.ParseFiles(req)
 	if err != nil {
 		return fail("%v", err)

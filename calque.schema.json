@@ -29,7 +29,7 @@
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]*$",
             "description": "A storage backend registered in the calque binary being run. The target must support it: pairing a language with a store its runtime has no adapter for is refused at generate time, not discovered at import time.",
-            "examples": ["dexie", "memory", "entsql"]
+            "examples": ["dexie", "entsql"]
           },
           "out": {
             "type": "string",
@@ -40,7 +40,7 @@
           "name": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]*$",
-            "description": "Disambiguates two entries with the same target, and is the key for per-instance option sections. Defaults to the target name."
+            "description": "Disambiguates two entries with the same target. Defaults to the target name. It is a label rather than a section key: options are claimed under the target's own name, so two entries running the same target read the same options."
           }
         }
       }
