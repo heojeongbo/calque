@@ -1,7 +1,7 @@
-import { type DescMessage, type MessageShape, clone } from "@bufbuild/protobuf";
+import { clone, type DescMessage, type MessageShape } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { type Key, unsafe } from "@heojeongbo/calque-runtime";
-import type { Table, default as Dexie } from "dexie";
+import type { default as Dexie, Table } from "dexie";
 
 type V_<Desc extends DescMessage> = MessageShape<Desc>;
 
@@ -16,7 +16,8 @@ type V_<Desc extends DescMessage> = MessageShape<Desc>;
 type E_<Desc extends DescMessage> = Omit<V_<Desc>, "$typeName" | "$unknown">;
 
 type T_<Desc extends DescMessage> = Table<E_<Desc>, Key>;
-type D_<Desc extends DescMessage> = Dexie & Record<V_<Desc>["$typeName"], T_<Desc>>;
+type D_<Desc extends DescMessage> = Dexie &
+	Record<V_<Desc>["$typeName"], T_<Desc>>;
 
 export type ValueOf<Desc extends DescMessage> = V_<Desc>;
 export type EntityOf<Desc extends DescMessage> = E_<Desc>;
@@ -25,11 +26,12 @@ export type DbOf<Desc extends DescMessage> = D_<Desc>;
 /**
  * The base every generated table extends.
  *
- * Ported from `@protobuf-orm/runtime@0.0.1` deliberately unchanged, including
- * the bug in `_reconcile`. calque's first version has to behave exactly as the
- * generator it replaces, so that swapping them changes nothing and can be
- * reverted; the bugs are then fixed one commit at a time, where each diff is
- * only the change it claims to be.
+ * Ported from `@protobuf-orm/runtime@0.0.1` deliberately unchanged at first,
+ * bug in `_reconcile` included: the first version had to behave exactly as the
+ * generator it replaces, so that swapping them changed nothing and could be
+ * reverted. The bugs are fixed one at a time after that, each in a commit whose
+ * diff is only the change it claims to be — `_reconcile` in v0.2.0, which is
+ * why moving to that version is a minor bump and not a patch.
  */
 export class TableBase<Desc extends DescMessage = DescMessage> {
 	protected readonly _db: D_<Desc>;

@@ -218,7 +218,9 @@ describe("what Dexie can hold", () => {
 		for (const stores of ["id,[a+b]", "id,&[a+b]"]) {
 			const rows = open(stores).table("rows");
 			await rows.add({ id: 1, a: "x", b: "y" });
-			expect(await rows.where({ a: "x", b: "y" }).first()).toMatchObject({ id: 1 });
+			expect(await rows.where({ a: "x", b: "y" }).first()).toMatchObject({
+				id: 1,
+			});
 		}
 	});
 });

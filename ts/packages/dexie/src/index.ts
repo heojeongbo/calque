@@ -6,5 +6,5 @@
  * so a second backend is a package beside this one rather than a fork of it.
  */
 export * from "@heojeongbo/calque-runtime";
-export { TableBase } from "./db";
 export type { DbOf, EntityOf, ValueOf } from "./db";
+export { TableBase } from "./db";

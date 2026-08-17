@@ -10,7 +10,11 @@ export function rm(obj: Record<string, unknown>, key: string): void {
 }
 
 /** Assign a property on a possibly-absent object. */
-export function set<T extends object, V>(obj: T | undefined, key: keyof T, value: V): void {
+export function set<T extends object, V>(
+	obj: T | undefined,
+	key: keyof T,
+	value: V,
+): void {
 	if (obj === undefined) return;
 	(obj as Record<keyof T, unknown>)[key] = value;
 }
