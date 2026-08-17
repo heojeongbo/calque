@@ -122,9 +122,16 @@ func (b *Backend) Accepts(kind gen.ShortfallKind) bool {
 // Capabilities states what IndexedDB can hold, not what calque wishes it could.
 func (b *Backend) Capabilities() gen.Capabilities {
 	return gen.Capabilities{
-		// Dexie's compound index has no unique form. This is the entry the
-		// whole type exists for.
-		UniqueCompoundIndex: false,
+		// It does hold one. `&[a+b]` parses as unique and compound -- Dexie
+		// decides the two independently -- and createIndex gets `unique: true`
+		// with the array key path, which IndexedDB enforces.
+		//
+		// This said false for a while, and docs/conformance.md item 3 was built
+		// on it. The claim came from the generator being reproduced, which
+		// emitted `[a+b]` and dropped the constraint; that the store could not
+		// hold it was the inference, and it was wrong. The runtime package
+		// measures it now: a second row with the same pair is a ConstraintError.
+		UniqueCompoundIndex: true,
 		// IndexedDB has no partial index, so a unique index cannot be narrowed
 		// to the rows that are still there.
 		PartialIndex: false,
@@ -289,9 +296,32 @@ func (v keyPartVisitor) VisitIndex(idx *schema.Index) (string, error) {
 		}
 		parts = append(parts, part)
 	}
-	// Brackets even for a single member: that is what the corpus has, and
-	// "[device_id]" and "device_id" are different index names to Dexie.
-	return "[" + strings.Join(parts, "+") + "]", nil
+	// Brackets say how many members there are; "&" says the index is unique.
+	// They are separate axes and the generator being reproduced ran them
+	// together -- it always bracketed and never marked unique, which is two
+	// distinct failures.
+	//
+	// A one-member index registers under the name "[a]", and `where({a})` takes
+	// Dexie's single-key branch, which looks an index up by the name "a". So the
+	// index it declares can never be found by the query it generates. A
+	// multi-member one is queryable, because that branch searches by key path,
+	// but it is not unique -- and Dexie holds `&[a+b]` perfectly well, which is
+	// measured in the runtime package's tests rather than assumed here.
+	if v.compat {
+		return "[" + strings.Join(parts, "+") + "]", nil
+	}
+
+	// Every index that reaches a schema string came from Entity.Keys(), which
+	// yields only unique elements, so this is always "&". It is asked rather
+	// than assumed because the answer is the whole point of the line.
+	prefix := ""
+	if idx.IsUnique() {
+		prefix = "&"
+	}
+	if len(parts) == 1 {
+		return prefix + parts[0], nil
+	}
+	return prefix + "[" + strings.Join(parts, "+") + "]", nil
 }
 
 type indexMemberVisitor struct{ compat bool }

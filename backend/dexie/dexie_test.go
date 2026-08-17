@@ -1,6 +1,7 @@
 package dexie_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -100,8 +101,8 @@ func TestCompatSpellsIndexesWithTheProtoName(t *testing.T) {
 
 	fixed, err := configured(t, dexie.CompatNone).SchemaString(e)
 	require.NoError(t, err)
-	require.Equal(t, "&id,&tokenHash,[deviceId]", fixed,
-		"the row actually carries the JSON name")
+	require.Equal(t, "&id,&tokenHash,&deviceId", fixed,
+		"the row actually carries the JSON name, and a one-member index is a plain one")
 }
 
 // TestNonUniqueIndexIsNotEmitted records a gap rather than a design.
@@ -152,7 +153,13 @@ func TestMismatchesNamesWhatIsWrong(t *testing.T) {
 // they are what makes the refusal in gen/capability.go meaningful.
 func TestCapabilities(t *testing.T) {
 	caps := dexie.New().Capabilities()
-	require.False(t, caps.UniqueCompoundIndex, "Dexie has no unique compound index")
+	// This said false until it was measured. `&[a+b]` parses as unique and
+	// compound, and IndexedDB enforces unique on an array key path; the
+	// predecessor's `[a+b]` dropped the constraint, and "the store cannot hold
+	// it" was an inference from that rather than a fact about the store. See the
+	// runtime package's tests, which put two colliding rows in and get a
+	// ConstraintError.
+	require.True(t, caps.UniqueCompoundIndex, "Dexie holds `&[a+b]`")
 	require.False(t, caps.PartialIndex, "IndexedDB has no partial index")
 	require.False(t, caps.BinaryKey, "which is why a uuid is stored as text")
 	require.True(t, caps.NestedKeyPath)
@@ -259,4 +266,41 @@ dexie:
 	require.ErrorContains(t, err, `accept "uniqe_compound_index"`)
 	require.ErrorContains(t, err, "calque knows:")
 	require.ErrorContains(t, err, "unique_compound_index")
+}
+
+// TestEveryDeclaredIndexIsEnforced is the invariant the one-member bug slipped
+// through, and it is one line of assertion because that is all it needed to be.
+//
+// Every part of a schema string comes from Entity.Keys(), which yields only
+// unique elements. So every part must be marked unique -- if one is not, the
+// generator is declaring an index the store will not enforce while the
+// capability check reports nothing, because IsComposite() is len > 1 and a
+// one-member index is not composite.
+//
+// `[deviceId]` fails this. So would any future shape that forgets the "&".
+func TestEveryDeclaredIndexIsEnforced(t *testing.T) {
+	b := configured(t, dexie.CompatNone)
+
+	for _, file := range []string{"apptest.proto", "erased.proto", "naming.proto"} {
+		s := parse(t, file)
+		for _, e := range s.Entities() {
+			str, err := b.SchemaString(e)
+			require.NoError(t, err)
+
+			for i, part := range strings.Split(str, ",") {
+				require.True(t, strings.HasPrefix(part, "&"),
+					"%s: part %d of %q is not unique, but every part comes from Keys()",
+					e.FullName(), i, str)
+
+				// And a one-member index must not be bracketed: "[a]" registers
+				// under that name, and where({a}) looks for "a".
+				inner := strings.TrimPrefix(part, "&")
+				if strings.HasPrefix(inner, "[") {
+					require.Contains(t, inner, "+",
+						"%s: %q is a one-member index in compound syntax, which no query can find",
+						e.FullName(), part)
+				}
+			}
+		}
+	}
 }

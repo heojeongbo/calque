@@ -134,3 +134,91 @@ describe("TableBase over a real IndexedDB", () => {
 		expect((await plain.read("a")).name).toBe("first");
 	});
 });
+
+/**
+ * What Dexie can actually hold, measured rather than read off a doc page.
+ *
+ * calque's dexie backend declared `UniqueCompoundIndex: false` and
+ * docs/conformance.md item 3 was built on it: a unique index over more than one
+ * property was said to be inexpressible, so the generator emitted `[a+b]`
+ * without the `&` and reported the constraint as one the store could not keep.
+ *
+ * Dexie 4's parser decides `unique` from `/&/` and `compound` from whether the
+ * key path is an array, independently (dist/dexie.js:4056-4060), nothing in
+ * _parseStoresSpec forbids the combination (4079-4090), and addIndex passes
+ * `unique` straight to createIndex whatever the key path is (3983-3987). So the
+ * claim looked wrong. This is the check.
+ */
+describe("what Dexie can hold", () => {
+	function open(stores: string): Dexie {
+		const indexedDB = new IDBFactory();
+		const db = new Dexie("caps", { indexedDB });
+		db.version(1).stores({ rows: stores });
+		return db;
+	}
+
+	it("enforces a unique index over two properties", async () => {
+		const db = open("id,&[a+b]");
+		const rows = db.table("rows");
+
+		await rows.add({ id: 1, a: "x", b: "y" });
+		await expect(rows.add({ id: 2, a: "x", b: "y" })).rejects.toThrow(
+			/ConstraintError|constraint/i,
+		);
+
+		// A different pair is not a collision, so the index is on the pair and
+		// not on either member.
+		await rows.add({ id: 3, a: "x", b: "z" });
+		expect(await rows.count()).toBe(2);
+	});
+
+	// The form the generator used to emit. It is a *different index name* --
+	// Dexie keeps the brackets in the name -- and it is not unique.
+	it("does not enforce anything for a bracketed index without &", async () => {
+		const db = open("id,[a+b]");
+		const rows = db.table("rows");
+
+		await rows.add({ id: 1, a: "x", b: "y" });
+		await rows.add({ id: 2, a: "x", b: "y" });
+		expect(await rows.count()).toBe(2);
+	});
+
+	/**
+	 * The bug this file was extended for. A one-member index in compound syntax
+	 * registers under the name "[a]", and `where({a})` takes the single-key
+	 * branch (dist/dexie.js:1493-1495), which looks an index up by the name "a".
+	 * So the declared index can never be queried the way the generated code
+	 * queries it.
+	 */
+	it("cannot query a one-member bracketed index by its member", async () => {
+		const db = open("id,[a]");
+		const rows = db.table("rows");
+		await rows.add({ id: 1, a: "x" });
+
+		await expect(rows.where({ a: "x" }).first()).rejects.toThrow(
+			/SchemaError|not indexed/i,
+		);
+	});
+
+	it("queries it when the same index is declared as a plain unique one", async () => {
+		const db = open("id,&a");
+		const rows = db.table("rows");
+		await rows.add({ id: 1, a: "x" });
+
+		expect(await rows.where({ a: "x" }).first()).toMatchObject({ id: 1 });
+		await expect(rows.add({ id: 2, a: "x" })).rejects.toThrow(
+			/ConstraintError|constraint/i,
+		);
+	});
+
+	// Two members query fine either way, because the multi-key branch searches
+	// schema.indexes by key path rather than by name (1496-1513). That is why
+	// only the one-member case was broken.
+	it("queries a two-member index whether or not it is unique", async () => {
+		for (const stores of ["id,[a+b]", "id,&[a+b]"]) {
+			const rows = open(stores).table("rows");
+			await rows.add({ id: 1, a: "x", b: "y" });
+			expect(await rows.where({ a: "x", b: "y" }).first()).toMatchObject({ id: 1 });
+		}
+	});
+});
