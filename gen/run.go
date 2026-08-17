@@ -50,6 +50,21 @@ func Run(s *schema.Schema, cfg *Config, r *Registry, options ...RunOption) (*Out
 		if err != nil {
 			return nil, fmt.Errorf("%s: targets(%s): %w", cfg.Path(), entry.Label(), err)
 		}
+		// A storeless target has no backend to resolve or pair with, and naming
+		// one for it is a mistake worth reporting: it would say the output depends
+		// on a store when it does not.
+		if isStoreless(t) {
+			if entry.Backend != "" {
+				return nil, fmt.Errorf("%s: targets(%s): target %q emits nothing store-specific, so it takes no `backend` (got %q)",
+					cfg.Path(), entry.Label(), t.Name(), entry.Backend)
+			}
+			plan = append(plan, resolved{entry: entry, target: t})
+			continue
+		}
+		if entry.Backend == "" {
+			return nil, fmt.Errorf("%s: targets(%s): `backend` is required (a registered backend name); only a storeless target may omit it",
+				cfg.Path(), entry.Label())
+		}
 		b, err := r.LookupBackend(entry.Backend)
 		if err != nil {
 			return nil, fmt.Errorf("%s: targets(%s): %w", cfg.Path(), entry.Label(), err)
@@ -65,6 +80,9 @@ func Run(s *schema.Schema, cfg *Config, r *Registry, options ...RunOption) (*Out
 	for _, p := range plan {
 		if err := p.target.Configure(cfg, p.target.Name()); err != nil {
 			return nil, fmt.Errorf("%s: %w", p.entry.Label(), err)
+		}
+		if p.backend == nil {
+			continue
 		}
 		if err := p.backend.Configure(cfg, p.backend.Name()); err != nil {
 			return nil, fmt.Errorf("%s: %w", p.entry.Label(), err)
@@ -83,27 +101,35 @@ func Run(s *schema.Schema, cfg *Config, r *Registry, options ...RunOption) (*Out
 	opts.progress.Start(len(s.Sources()), len(plan))
 
 	for _, p := range plan {
-		opts.progress.TargetStart(p.entry.Label(), p.backend.Name())
+		opts.progress.TargetStart(p.entry.Label(), backendName(p.backend))
 
-		// Facts first, then policy. Every shortfall is computed and reported
-		// whatever happens to it; the backend only decides which ones stop the
-		// run. An accepted one still goes to stderr on every build, because a
-		// constraint the store cannot hold does not stop being worth saying
-		// once someone has agreed to live with it.
-		accepted, refused := CheckCapabilities(s, p.backend).Partition(p.backend)
-		if len(refused) > 0 {
-			return nil, fmt.Errorf("%s: %w", p.entry.Label(), refused.Err())
-		}
-		if len(accepted) > 0 {
-			fmt.Fprintf(opts.warn, "calque: %s: %v\n", p.entry.Label(), accepted.Err())
-		}
+		// A storeless target skips all of this. Capabilities are facts about a
+		// store, lowering is a store's decisions, and neither is a question about
+		// output that describes no store -- running them anyway would let a
+		// shortfall in a backend this target does not use stop a file it does.
+		var lowered *Lowered
+		if p.backend != nil {
+			// Facts first, then policy. Every shortfall is computed and reported
+			// whatever happens to it; the backend only decides which ones stop the
+			// run. An accepted one still goes to stderr on every build, because a
+			// constraint the store cannot hold does not stop being worth saying
+			// once someone has agreed to live with it.
+			accepted, refused := CheckCapabilities(s, p.backend).Partition(p.backend)
+			if len(refused) > 0 {
+				return nil, fmt.Errorf("%s: %w", p.entry.Label(), refused.Err())
+			}
+			if len(accepted) > 0 {
+				fmt.Fprintf(opts.warn, "calque: %s: %v\n", p.entry.Label(), accepted.Err())
+			}
 
-		lowered, err := p.backend.Lower(s)
-		if err != nil {
-			return nil, fmt.Errorf("%s: lower for %s: %w", p.entry.Label(), p.backend.Name(), err)
-		}
-		if err := checkCodecs(lowered, p.backend); err != nil {
-			return nil, fmt.Errorf("%s: %w", p.entry.Label(), err)
+			var err error
+			lowered, err = p.backend.Lower(s)
+			if err != nil {
+				return nil, fmt.Errorf("%s: lower for %s: %w", p.entry.Label(), p.backend.Name(), err)
+			}
+			if err := checkCodecs(lowered, p.backend); err != nil {
+				return nil, fmt.Errorf("%s: %w", p.entry.Label(), err)
+			}
 		}
 
 		g := NewGenerator(s, lowered, p.backend, cfg, p.entry, &diags)
@@ -118,7 +144,7 @@ func Run(s *schema.Schema, cfg *Config, r *Registry, options ...RunOption) (*Out
 				return nil, err
 			}
 		}
-		opts.progress.TargetDone(p.entry.Label(), p.backend.Name(), len(files))
+		opts.progress.TargetDone(p.entry.Label(), backendName(p.backend), len(files))
 	}
 	opts.progress.Finish()
 
@@ -128,6 +154,14 @@ func Run(s *schema.Schema, cfg *Config, r *Registry, options ...RunOption) (*Out
 		return nil, err
 	}
 	return out, nil
+}
+
+// backendName is a backend's name, or "" when a storeless target has none.
+func backendName(b Backend) string {
+	if b == nil {
+		return ""
+	}
+	return b.Name()
 }
 
 // checkCodecs verifies that every transform a lowering chose is one the backend

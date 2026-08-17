@@ -174,11 +174,13 @@ func (c *Config) validate() error {
 		if err := checkName(t.Target); err != nil {
 			return fmt.Errorf("%s: target: %w", where, err)
 		}
-		if t.Backend == "" {
-			return fmt.Errorf("%s(%s): `backend` is required (a registered backend name)", where, t.Target)
-		}
-		if err := checkName(t.Backend); err != nil {
-			return fmt.Errorf("%s(%s): backend: %w", where, t.Target, err)
+		// `backend` is checked for spelling here and for presence in Run, which
+		// is the only place that knows whether the target is storeless -- a
+		// service contract describes no store and takes no backend at all.
+		if t.Backend != "" {
+			if err := checkName(t.Backend); err != nil {
+				return fmt.Errorf("%s(%s): backend: %w", where, t.Target, err)
+			}
 		}
 		if t.Name != "" {
 			if err := checkName(t.Name); err != nil {

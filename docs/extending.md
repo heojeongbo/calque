@@ -178,6 +178,26 @@ for. It is checked before anything is configured, so pairing a language with a
 store it cannot speak to fails naming both — rather than emitting a package that
 imports an adapter nobody wrote.
 
+### A target with no store
+
+Some output describes what may be asked for rather than where anything is kept —
+a service contract, a client, a document. Such a target declares one more method
+and takes no `backend`:
+
+```go
+// Storeless says this target emits nothing store-specific.
+func (t *Target) Storeless() {}
+```
+
+`gen.Run` then skips backend resolution, capability checking and lowering for it,
+and `Lowered()`, `Table()` and `Backend()` on its `Generator` are nil — `Table()`
+says so rather than dereferencing one. Naming a `backend` for a storeless target
+is an error: it would claim the output depends on a store when it does not.
+
+It is an optional interface rather than a method on `Target` for the same reason
+`ShortfallAccepter` is one on the backend side — a method every implementation
+stubs out with `false` is not information.
+
 `Emit` returns files whose names are paths relative to the plugin's output root.
 Do **not** apply the entry's `out` yourself; `gen.Run` does it. Two targets
 claiming the same path is an error naming both, not last-one-wins.

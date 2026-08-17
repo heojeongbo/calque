@@ -37,6 +37,30 @@ type Target interface {
 	Emit(g *Generator) ([]File, error)
 }
 
+// Storeless is a target that emits nothing store-specific.
+//
+// A target that implements it may leave `backend` out of its config entry, and
+// gen.Run skips capability checking and lowering for it: Table, Lowered and
+// Backend on its Generator are nil, and asking for one is a diagnostic rather
+// than a nil dereference.
+//
+// It is an optional interface for the same reason ShortfallAccepter is -- see
+// capability.go. A method on Target would make both existing targets answer a
+// question only this one has an opinion about, and answering it as `false` twice
+// is not information.
+//
+// What makes a target storeless is not that it happens not to look: a service
+// contract describes what may be asked for, not where anything is kept, so
+// pairing it with a store would run capability checks that could refuse a schema
+// for a reason its output does not depend on.
+type Storeless interface{ Storeless() }
+
+// isStoreless reports whether a target opted out of having a backend.
+func isStoreless(t Target) bool {
+	_, ok := t.(Storeless)
+	return ok
+}
+
 // File is one emitted file.
 type File struct {
 	// Name is a slash-separated path relative to the plugin's output root. It
@@ -118,13 +142,26 @@ func (g *Generator) Schema() *schema.Schema { return g.schema }
 // runs both claim its file.
 func (g *Generator) Sources() []*schema.Entity { return g.schema.Sources() }
 
-// Lowered is the storage decisions the chosen backend made.
+// Lowered is the storage decisions the chosen backend made, or nil for a
+// Storeless target, which was paired with no backend to make any.
 func (g *Generator) Lowered() *Lowered { return g.lowered }
 
 // Table is the lowering for one entity.
-func (g *Generator) Table(e *schema.Entity) (*Table, error) { return g.lowered.Table(e) }
+//
+// A Storeless target has none, and asking is a bug in that target rather than in
+// the schema -- so it says which target and that the reason is the interface it
+// declared, instead of dereferencing nil.
+func (g *Generator) Table(e *schema.Entity) (*Table, error) {
+	if g.lowered == nil {
+		return nil, fmt.Errorf("%s: no storage decisions to read: this target declared gen.Storeless, so it was paired with no backend",
+			g.entry.Label())
+	}
+	return g.lowered.Table(e)
+}
 
-// Backend is the backend this target was paired with.
+// Backend is the backend this target was paired with, or nil for a Storeless
+// target. A target that asserts on a concrete backend already handles nil: the
+// type assertion fails and it reports what it wanted.
 func (g *Generator) Backend() Backend { return g.backend }
 
 // Config is the whole config, for a target that needs to claim its section.

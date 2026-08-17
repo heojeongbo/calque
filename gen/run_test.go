@@ -137,6 +137,14 @@ func (t *fakeTarget) Emit(g *gen.Generator) ([]gen.File, error) {
 	return out, nil
 }
 
+// storelessTarget is a fakeTarget that declares gen.Storeless.
+//
+// Embedding rather than reimplementing keeps the two identical apart from the one
+// method that is the point.
+type storelessTarget struct{ fakeTarget }
+
+func (t *storelessTarget) Storeless() {}
+
 func config(t *testing.T, doc string) *gen.Config {
 	t.Helper()
 	c, err := gen.ParseConfig([]byte(doc), "calque.yaml")
@@ -332,3 +340,54 @@ func TestRegistryRefusesDuplicateNames(t *testing.T) {
 }
 
 var _ = fmt.Sprintf // keep fmt if the file is trimmed
+
+// --- storeless targets -------------------------------------------------------
+
+// TestStorelessTargetNeedsNoBackend: the whole point of the interface.
+//
+// It also asserts what a storeless target is handed: nil where the store's
+// decisions would be. A target that reaches for them is a bug, and one that does
+// not cannot be refused for a shortfall in a store it never asked about.
+func TestStorelessTargetNeedsNoBackend(t *testing.T) {
+	s := fixtureSchema(t)
+
+	var sawLowered, sawBackend bool
+	tgt := &storelessTarget{fakeTarget{name: "svc", emit: func(g *gen.Generator) ([]gen.File, error) {
+		sawLowered = g.Lowered() != nil
+		sawBackend = g.Backend() != nil
+		return []gen.File{{Name: "x.proto", Body: []byte("edition = \"2023\";\n")}}, nil
+	}}}
+
+	// A strict backend that refuses everything is registered and must not run.
+	r := gen.NewRegistry().Target(tgt).Backend(&fakeBackend{name: "strict", caps: gen.Capabilities{}})
+
+	out, err := gen.Run(s, config(t, "version: 1\ntargets:\n  - target: svc\n"), r)
+	require.NoError(t, err)
+	require.Equal(t, []string{"x.proto"}, out.Names())
+	require.False(t, sawLowered, "a storeless target gets no Lowered")
+	require.False(t, sawBackend, "a storeless target gets no Backend")
+}
+
+// TestStorelessTargetRefusesABackend: naming one says the output depends on a
+// store, and it does not.
+func TestStorelessTargetRefusesABackend(t *testing.T) {
+	s := fixtureSchema(t)
+	r := gen.NewRegistry().
+		Target(&storelessTarget{fakeTarget{name: "svc"}}).
+		Backend(&fakeBackend{name: "store"})
+
+	_, err := gen.Run(s, config(t, "version: 1\ntargets:\n  - {target: svc, backend: store}\n"), r)
+	require.ErrorContains(t, err, "emits nothing store-specific, so it takes no `backend`")
+	require.ErrorContains(t, err, `got "store"`)
+}
+
+// TestBackendIsRequiredForAnythingElse: moving the check out of config validation
+// must not lose it.
+func TestBackendIsRequiredForAnythingElse(t *testing.T) {
+	s := fixtureSchema(t)
+	r := gen.NewRegistry().Target(&fakeTarget{name: "ts"}).Backend(&fakeBackend{name: "store"})
+
+	_, err := gen.Run(s, config(t, "version: 1\ntargets:\n  - target: ts\n"), r)
+	require.ErrorContains(t, err, "`backend` is required")
+	require.ErrorContains(t, err, "only a storeless target may omit it")
+}

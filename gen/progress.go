@@ -66,8 +66,14 @@ func (p *Progress) TargetDone(label, backend string, files int) {
 	if p.targets > 0 {
 		pct = p.done * 100 / p.targets
 	}
-	fmt.Fprintf(p.w, "calque: [%d/%d] %3d%%  %s → %s  %s  (%s)\n",
-		p.done, p.targets, pct, label, backend,
+	// A storeless target has no backend to arrow into, so the arrow goes too
+	// rather than pointing at an empty string.
+	what := label
+	if backend != "" {
+		what = label + " → " + backend
+	}
+	fmt.Fprintf(p.w, "calque: [%d/%d] %3d%%  %s  %s  (%s)\n",
+		p.done, p.targets, pct, what,
 		plural(files, "file", "files"), took(time.Since(p.targetAt)))
 }
 

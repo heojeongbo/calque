@@ -42,7 +42,7 @@ wrote.
 | key | required | default | |
 |---|---|---|---|
 | `target` | yes | | a target registered in the binary being run |
-| `backend` | yes | | a backend registered in the binary being run |
+| `backend` | usually | | a backend registered in the binary being run. A *storeless* target takes none — see below |
 | `out` | | `""` | a subdirectory of the output root buf gives the plugin |
 | `name` | | `target` | disambiguates two entries with the same target |
 
@@ -67,6 +67,20 @@ A pairing a target does not accept is refused before anything is configured,
 naming what it does accept. A target's runtime has adapters for specific stores;
 selecting one it has no adapter for should not produce a package that imports
 something nobody wrote.
+
+#### Storeless targets
+
+A target that emits nothing store-specific takes **no `backend` at all**, and
+naming one for it is an error rather than a harmless extra:
+
+```yaml
+targets:
+  - target: service        # no backend
+```
+
+Capabilities are facts about a store and lowering is a store's decisions, so
+neither is a question about output that describes no store. Running them anyway
+would let a shortfall in a backend the target does not use refuse a file it does.
 
 ### `ts:`
 

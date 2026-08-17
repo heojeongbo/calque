@@ -60,8 +60,14 @@ func TestTargetsAreRequired(t *testing.T) {
 	_, err = parse(t, "version: 1\ntargets:\n  - backend: dexie\n")
 	require.ErrorContains(t, err, "`target` is required")
 
+	// A missing `backend` is checked in Run, not here: only Run knows whether
+	// the target is storeless and therefore takes none. See run_test.go.
 	_, err = parse(t, "version: 1\ntargets:\n  - target: ts\n")
-	require.ErrorContains(t, err, "`backend` is required")
+	require.NoError(t, err)
+
+	// The spelling is still checked here, because that needs no registry.
+	_, err = parse(t, "version: 1\ntargets:\n  - {target: ts, backend: \"Not A Name\"}\n")
+	require.ErrorContains(t, err, "backend:")
 }
 
 // TestOutStaysInsideTheOutputRoot: buf owns the root and hands it to the
