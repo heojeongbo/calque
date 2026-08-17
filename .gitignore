@@ -4,3 +4,10 @@
 
 node_modules/
 dist/
+
+# Secrets. This repository is public, and an npm token committed here is an npm
+# token published. Listed before any such file existed, on purpose.
+.env
+.env.*
+!.env.example
+.npmrc
