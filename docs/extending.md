@@ -273,3 +273,37 @@ If you are replacing an existing generator, add a reference test like
 `target/ts/reference_test.go`: it takes a proto root and an expected output tree
 from environment variables and diffs every file, and skips when they are unset.
 That keeps a private tree out of the repository while still gating on it.
+
+## Reading the schema from your own plugin
+
+Not every use of calque is a calque target. A plugin that already generates
+something of its own — an OpenAPI document, a client, a migration — may want
+calque's model of the schema without calque's output: the entities, their props,
+edges and indexes, with the annotations read and validated.
+
+`ormcompat` is that entry point, and it has two forms because there are two
+things a plugin might be holding.
+
+```go
+// If you have the raw request:
+s, err := ormcompat.Parse(req)              // req *pluginpb.CodeGeneratorRequest
+
+// If you have already built a protogen.Plugin, which most Go plugins have:
+s, err := ormcompat.ParseProtogen(p)        // p *protogen.Plugin
+```
+
+Both return the same `*schema.Schema` for the same input, and a test asserts it
+(`ormcompat/protogen_test.go`) — including that a schema one refuses is refused
+by the other with the same message. Which you call is about what you have, never
+about what you get.
+
+The split exists because of the `go_package` cost described in
+[Architecture](architecture.md#protogen-is-a-cost-the-go-target-pays-alone).
+`ParseProtogen` does not impose it: a caller who built a `protogen.Plugin` has
+already paid it. `Parse` is for a caller who has not, and a proto tree generated
+only for TypeScript is a real example of one.
+
+From there you are in `schema`, which is documented in
+[Reading the schema](#reading-the-schema) above — the same API a target sees, and
+the same guarantee that `Sources()` is what to emit and `Schema()` is what to
+understand.

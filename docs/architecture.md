@@ -162,6 +162,11 @@ the api-level flags protoc-gen-go was given. Deriving those independently would
 mean agreeing with protoc-gen-go by imitation, and disagreeing silently. So it
 uses protogen, and the cost lands on the target that benefits.
 
+Which is also why `ormcompat` has a second entry point. A plugin that wants
+calque's schema and nothing else calls `Parse`; one that has already built a
+`protogen.Plugin` — and therefore already paid — calls `ParseProtogen`. Same
+schema either way; see [Extending](extending.md#reading-the-schema-from-your-own-plugin).
+
 ## The vocabulary is vendored by number
 
 calque carries its own copy of the `orm.*` options in package `calque.orm`, with

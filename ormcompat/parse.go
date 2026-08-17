@@ -15,6 +15,7 @@ package ormcompat
 import (
 	"fmt"
 
+	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -58,35 +59,71 @@ func ParseFiles(req *pluginpb.CodeGeneratorRequest) (*schema.Schema, *protoregis
 	return s, files, nil
 }
 
-func parseWith(req *pluginpb.CodeGeneratorRequest, files *protoregistry.Files) (*schema.Schema, error) {
+// ParseProtogen builds the schema from a plugin protogen has already resolved.
+//
+// It exists for a plugin that is doing its own generation and wants calque's
+// model of the schema rather than calque's output — the entities, their props,
+// edges and indexes, with the annotations already read and validated.
+//
+// Taking a *protogen.Plugin does not make this package depend on protogen the
+// way the package comment warns about. The caller has already built one, and
+// therefore already paid protogen's price: every file in the closure needs a
+// go_package. Parse is still the entry point for anything that has not.
+func ParseProtogen(p *protogen.Plugin) (*schema.Schema, error) {
+	// protogen builds Files by walking the request's proto_file in order, so
+	// this is the same dependency-first order Parse sees and the entity order
+	// does not depend on which entry point was used.
+	in := make([]fileToParse, 0, len(p.Files))
+	for _, f := range p.Files {
+		in = append(in, fileToParse{fd: f.Desc, generate: f.Generate})
+	}
+	return parseDescriptors(in)
+}
 
+// fileToParse is one file and whether its entities are to be emitted.
+//
+// It is the whole of what parsing needs from a request. Narrowing to it is what
+// lets a CodeGeneratorRequest and a protogen.Plugin share every line below.
+type fileToParse struct {
+	fd       protoreflect.FileDescriptor
+	generate bool
+}
+
+func parseWith(req *pluginpb.CodeGeneratorRequest, files *protoregistry.Files) (*schema.Schema, error) {
 	generate := make(map[string]bool, len(req.GetFileToGenerate()))
 	for _, name := range req.GetFileToGenerate() {
 		generate[name] = true
 	}
 
-	var diags schema.Diagnostics
-	var entities []*schema.Entity
-
 	// In request order, which is dependency-first, so the schema's entity order
 	// is stable and golden output does not move because a file was renamed.
+	in := make([]fileToParse, 0, len(req.GetProtoFile()))
 	for _, fdp := range req.GetProtoFile() {
 		fd, err := files.FindFileByPath(fdp.GetName())
 		if err != nil {
 			return nil, fmt.Errorf("ormcompat: %s: %w", fdp.GetName(), err)
 		}
+		in = append(in, fileToParse{fd: fd, generate: generate[fd.Path()]})
+	}
+	return parseDescriptors(in)
+}
 
-		if err := checkVocabulary(fd, &diags); err != nil {
+func parseDescriptors(in []fileToParse) (*schema.Schema, error) {
+	var diags schema.Diagnostics
+	var entities []*schema.Entity
+
+	for _, f := range in {
+		if err := checkVocabulary(f.fd, &diags); err != nil {
 			return nil, err
 		}
 
-		msgs := fd.Messages()
+		msgs := f.fd.Messages()
 		for i := range msgs.Len() {
 			md := msgs.Get(i)
 			if !isEntity(md) {
 				continue
 			}
-			if e := parseEntity(md, generate[fd.Path()], &diags); e != nil {
+			if e := parseEntity(md, f.generate, &diags); e != nil {
 				entities = append(entities, e)
 			}
 		}
