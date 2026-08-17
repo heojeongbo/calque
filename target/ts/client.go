@@ -101,7 +101,7 @@ func (t *Target) emitQueryDesc(g *gen.Generator, f *tsw.File, e *entity) {
 	if !ok {
 		label = string(key.Names().Value)
 	}
-	f.P("\t\tpick: v => ({key:{case: \"", label, "\", value: v.", key.Names().Value, "}}),")
+	f.P("\t\tpick: v => ({", e.keyProp, ":{case: \"", label, "\", value: v.", key.Names().Value, "}}),")
 
 	f.P("\t\trefs: v => [")
 	for _, cand := range def.Keys() {
@@ -141,18 +141,20 @@ func (t *Target) emitRef(f *tsw.File, e *entity, cand schema.Elem) {
 
 	switch k := cand.(type) {
 	case *schema.Field:
-		f.P("\t\t\t{key:{case: \"", label, "\", value: v.", k.Names().Value, "}},")
+		f.P("\t\t\t{", e.keyProp, ":{case: \"", label, "\", value: v.", k.Names().Value, "}},")
 
 	case *schema.Edge:
 		tk := targetKey(k)
 		if tk == nil {
 			return
 		}
-		f.P("\t\t\t{key:{case: \"", label, "\", value: v.", k.Names().Value,
-			" && {key:{case: \"", tk.Names().Value, "\", value: v.", k.Names().Value, ".", tk.Names().Value, "}}}},")
+		// The inner one is the *target* entity's Ref, a different message that
+		// may spell its oneof differently.
+		f.P("\t\t\t{", e.keyProp, ":{case: \"", label, "\", value: v.", k.Names().Value,
+			" && {", e.targetKeyProp(k), ":{case: \"", tk.Names().Value, "\", value: v.", k.Names().Value, ".", tk.Names().Value, "}}}},")
 
 	case *schema.Index:
-		f.P("\t\t\t{key:{")
+		f.P("\t\t\t{", e.keyProp, ":{")
 		f.P("\t\t\t\tcase: \"", label, "\",")
 		f.P("\t\t\t\tvalue: {")
 		for _, p := range k.Props() {
@@ -165,7 +167,7 @@ func (t *Target) emitRef(f *tsw.File, e *entity, cand schema.Elem) {
 					continue
 				}
 				f.P("\t\t\t\t\t", m.Names().Value, ": v.", m.Names().Value,
-					" && {key:{case: \"", tk.Names().Value, "\", value: v.", m.Names().Value, ".", tk.Names().Value, "}},")
+					" && {", e.targetKeyProp(m), ":{case: \"", tk.Names().Value, "\", value: v.", m.Names().Value, ".", tk.Names().Value, "}},")
 			}
 		}
 		f.P("\t\t\t\t}")

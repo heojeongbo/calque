@@ -1,0 +1,65 @@
+edition = "2023";
+
+// valid/apptest_svc.proto with the Ref oneofs renamed to `lookup`.
+//
+// Both targets find that oneof by it being the only one on the message, so this
+// file must generate byte-identical output to the one it was copied from. See
+// testdata/proto/refoneof/README.md.
+package apptest;
+
+import "apptest.proto";
+
+option go_package = "example.com/apptest/oas";
+
+message TenantRef {
+  oneof lookup {
+    bytes id = 1;
+    string alias = 4;
+  }
+}
+
+message TenantSelect {
+  bool all = 1;
+}
+
+message TenantGetRequest {
+  TenantRef ref = 1;
+  TenantSelect select = 2;
+}
+
+service TenantService {
+  rpc Get(TenantGetRequest) returns (Tenant);
+}
+
+message UserRefBySlug {
+  string alias = 4;
+  TenantRef tenant = 2;
+}
+
+message UserRef {
+  oneof lookup {
+    bytes id = 1;
+    UserRefBySlug slug = 4;
+  }
+}
+
+message UserSelect {
+  bool all = 1;
+}
+
+message UserGetRequest {
+  UserRef ref = 1;
+  UserSelect select = 2;
+}
+
+message UserListRequest {}
+
+message UserListResponse {
+  repeated User items = 1;
+}
+
+service UserService {
+  rpc Add(User) returns (User);
+  rpc Get(UserGetRequest) returns (User);
+  rpc List(UserListRequest) returns (UserListResponse);
+}

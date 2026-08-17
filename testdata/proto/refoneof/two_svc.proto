@@ -1,0 +1,69 @@
+edition = "2023";
+
+// valid/apptest_svc.proto with a second oneof added to UserRef.
+//
+// Which oneof holds the lookups is now a guess, and a guess produces output that
+// compiles and queries the wrong field, so both targets refuse to make one. See
+// testdata/proto/refoneof/README.md.
+package apptest;
+
+import "apptest.proto";
+
+option go_package = "example.com/apptest/oas";
+
+message TenantRef {
+  oneof lookup {
+    bytes id = 1;
+    string alias = 4;
+  }
+}
+
+message TenantSelect {
+  bool all = 1;
+}
+
+message TenantGetRequest {
+  TenantRef ref = 1;
+  TenantSelect select = 2;
+}
+
+service TenantService {
+  rpc Get(TenantGetRequest) returns (Tenant);
+}
+
+message UserRefBySlug {
+  string alias = 4;
+  TenantRef tenant = 2;
+}
+
+message UserRef {
+  oneof unrelated {
+    string note = 90;
+  }
+
+  oneof lookup {
+    bytes id = 1;
+    UserRefBySlug slug = 4;
+  }
+}
+
+message UserSelect {
+  bool all = 1;
+}
+
+message UserGetRequest {
+  UserRef ref = 1;
+  UserSelect select = 2;
+}
+
+message UserListRequest {}
+
+message UserListResponse {
+  repeated User items = 1;
+}
+
+service UserService {
+  rpc Add(User) returns (User);
+  rpc Get(UserGetRequest) returns (User);
+  rpc List(UserListRequest) returns (UserListResponse);
+}

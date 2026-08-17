@@ -202,8 +202,15 @@ func (t *Target) emitGet(f *tsw.File, e *entity, name string) error {
 	key := def.Key()
 
 	f.P("\tget(req: MessageInitShape<typeof ", name, "GetRequestSchema>): Promise<", name, "> {")
-	f.P(`		if(req.ref?.key === undefined) return Promise.reject(this._err("key undefined", Code.InvalidArgument));`)
-	f.P("\t\tconst { key } = req.ref;")
+	f.P("\t\tif(req.ref?.", e.keyProp, ` === undefined) return Promise.reject(this._err("key undefined", Code.InvalidArgument));`)
+	// Destructured to the local name `key` so every case body below reads the
+	// same whatever the oneof is called -- and in shorthand when they coincide,
+	// which is every schema that spells it `key`.
+	if e.keyProp == "key" {
+		f.P("\t\tconst { key } = req.ref;")
+	} else {
+		f.P("\t\tconst { ", e.keyProp, ": key } = req.ref;")
+	}
 	f.P("\t\tswitch(key.case) {")
 
 	label, ok := caseLabel(e.ref, key)
@@ -240,7 +247,7 @@ func (t *Target) emitGetCase(f *tsw.File, e *entity, cand schema.Elem) error {
 	}
 	f.P(`			case "`, label, `": {`)
 
-	if _, err := schema.VisitElem[struct{}](cand, &getCaseVisitor{f: f}); err != nil {
+	if _, err := schema.VisitElem[struct{}](cand, &getCaseVisitor{f: f, e: e}); err != nil {
 		return err
 	}
 
@@ -253,7 +260,10 @@ func (t *Target) emitGetCase(f *tsw.File, e *entity, cand schema.Elem) error {
 //
 // It is a visitor so that a new Elem variant is a compile error here. This is
 // the exact spot the predecessor panics.
-type getCaseVisitor struct{ f *tsw.File }
+type getCaseVisitor struct {
+	f *tsw.File
+	e *entity
+}
 
 func (v *getCaseVisitor) VisitField(field *schema.Field) (struct{}, error) {
 	name := string(field.Names().Value)
@@ -271,11 +281,12 @@ func (v *getCaseVisitor) VisitEdge(edge *schema.Edge) (struct{}, error) {
 	name := string(edge.Names().Value)
 	path := name + "." + string(tk.Names().Value)
 
+	tp := v.e.targetKeyProp(edge)
 	v.f.P("\t\t\t\tconst v = key.value;")
-	v.f.P(`				if(v?.key?.case !== "`, tk.Names().Value, `"){`)
+	v.f.P("\t\t\t\tif(v?.", tp, `?.case !== "`, tk.Names().Value, `"){`)
 	v.f.P(`					return Promise.reject(this._err("composite query with non-keyed field not supported", Code.Unimplemented))`)
 	v.f.P("\t\t\t\t}")
-	v.f.P("\t\t\t\tconst q = { '", path, "': ", keyer(tk.Type(), "v?.key?.value"), " }")
+	v.f.P("\t\t\t\tconst q = { '", path, "': ", keyer(tk.Type(), "v?."+tp+"?.value"), " }")
 	v.f.P("\t\t\t\treturn this._query(t => t.where(q).first());")
 	return struct{}{}, nil
 }
@@ -294,7 +305,7 @@ func (v *getCaseVisitor) VisitIndex(idx *schema.Index) (struct{}, error) {
 		if tk == nil {
 			return struct{}{}, fmt.Errorf("ts: %s points at an entity with no key", edge.Name())
 		}
-		v.f.P("\t\t\t\tif(v.", edge.Names().Value, `?.key?.case !== "`, tk.Names().Value, `"){`)
+		v.f.P("\t\t\t\tif(v.", edge.Names().Value, "?.", v.e.targetKeyProp(edge), `?.case !== "`, tk.Names().Value, `"){`)
 		v.f.P(`					return Promise.reject(this._err("composite query with non-keyed field not supported", Code.Unimplemented))`)
 		v.f.P("\t\t\t\t}")
 	}
@@ -309,7 +320,7 @@ func (v *getCaseVisitor) VisitIndex(idx *schema.Index) (struct{}, error) {
 			tk := targetKey(m)
 			name := string(m.Names().Value)
 			v.f.P("\t\t\t\t\t'", name, ".", tk.Names().Value, "': ",
-				keyer(tk.Type(), "v."+name+"?.key?.value"), ",")
+				keyer(tk.Type(), "v."+name+"?."+v.e.targetKeyProp(m)+"?.value"), ",")
 		}
 	}
 	v.f.P("\t\t\t\t}")

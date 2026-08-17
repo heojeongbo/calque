@@ -123,8 +123,15 @@ func (e *emitter) shapeOf(en *schema.Entity) (*refShape, error) {
 		return nil, fmt.Errorf("%sGetRequest has no %sRef field", en.Name(), en.Name())
 	}
 
-	if len(ref.Oneofs) == 0 {
-		return nil, fmt.Errorf("%sRef has no oneof", en.Name())
+	// Exactly one, and its name is not read. This target used to take the first
+	// of however many there were while the TypeScript target asked for one named
+	// `key` -- two rules for one message, and a schema that satisfied only one of
+	// them got a silently different answer from each. One oneof is unambiguous
+	// whatever it is called; two are a schema neither target can read, so both
+	// now say so instead of picking.
+	if len(ref.Oneofs) != 1 {
+		return nil, fmt.Errorf("%sRef has %d oneofs; it needs exactly one (its name does not matter), because that is where the lookups are",
+			en.Name(), len(ref.Oneofs))
 	}
 	s.oneof = ref.Oneofs[0]
 

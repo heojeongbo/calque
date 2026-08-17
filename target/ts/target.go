@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 
 	"github.com/heojeongbo/calque/backend/dexie"
 	"github.com/heojeongbo/calque/gen"
@@ -91,6 +92,17 @@ type entity struct {
 	def     *schema.Entity
 	service protoreflect.ServiceDescriptor
 	ref     protoreflect.MessageDescriptor
+
+	// keyProp is the property its Ref's key lives under -- see refOneof. It is
+	// resolved once here rather than at each of the dozen places the emitted code
+	// dereferences it, which is how it came to be the literal `key` at all of
+	// them.
+	keyProp string
+
+	// targetKeyProp is the same, for an edge target: an index member spanning an
+	// edge reads the *target* entity's Ref, which is a different message and may
+	// spell its oneof differently.
+	targetKeyProp func(*schema.Edge) string
 }
 
 // module is the entity's own _pb module, as a relative import.
@@ -231,7 +243,23 @@ func (t *Target) group(g *gen.Generator) ([]*pkg, error) {
 			// and an entity without one is modelled but not stored.
 			continue
 		}
-		p.entities = append(p.entities, &entity{def: e, service: svc, ref: ref})
+		// A Ref whose oneof cannot be picked out sends every case label to
+		// defaultLabel, which computes what this would otherwise read. Say so
+		// once per entity rather than emitting the computed spelling in silence.
+		if ref != nil && soleOneof(ref) == nil {
+			g.Warnf("%s: %sRef has %d oneofs, so the lookup case labels cannot be read off it and are computed instead\n"+
+				"  a Ref message needs exactly one oneof; its name does not matter",
+				e.FullName(), e.Name(), ref.Oneofs().Len())
+		}
+		p.entities = append(p.entities, &entity{
+			def:     e,
+			service: svc,
+			ref:     ref,
+			keyProp: refOneof(g.Files(), e.FullName()),
+			targetKeyProp: func(edge *schema.Edge) string {
+				return refOneof(g.Files(), edge.Target().FullName())
+			},
+		})
 	}
 
 	out := make([]*pkg, 0, len(order))
@@ -266,11 +294,22 @@ func (t *Target) lookup(g *gen.Generator, e *schema.Entity) (protoreflect.Servic
 // store and the query can disagree about how a prop is spelled: two functions,
 // two answers, nothing comparing them. Reading the descriptor means there is
 // one answer, and it is the one the request message actually carries.
+//
+// The oneof is found by being the only one, not by being called `key`. Asking
+// for that name is what this did, and a schema spelling the oneof anything else
+// got nothing back -- so every label fell through to defaultLabel, which for an
+// index reproduces strcase.ToCamel instead of reading protoc's JSON name. Those
+// two agree for an ordinary snake_case name and are not guaranteed to, which is
+// the kind of dependency worth not having. The Go target read the same message
+// with no such requirement: two targets, two rules for one message.
+//
+// Nothing needs the name. One oneof is unambiguous whatever it is called, and two
+// are a schema neither target can read.
 func caseLabel(ref protoreflect.MessageDescriptor, key schema.Elem) (string, bool) {
 	if ref == nil {
 		return "", false
 	}
-	oneof := ref.Oneofs().ByName("key")
+	oneof := soleOneof(ref)
 	if oneof == nil {
 		return "", false
 	}
@@ -281,6 +320,52 @@ func caseLabel(ref protoreflect.MessageDescriptor, key schema.Elem) (string, boo
 		}
 	}
 	return "", false
+}
+
+// refOneof is the property a <Entity>Ref's key lives under.
+//
+// The emitted code reads and writes it -- `req.ref?.key`, `{key:{case:…}}` -- so
+// this has to be what protobuf-es actually generated, which is the oneof's own
+// name lower-camelled. It used to be the literal `key` in a dozen places, which
+// is correct for every schema that calls it that and silently wrong for one that
+// does not: the Go target emits `WhichLookup()` from the descriptor and would
+// disagree with a TypeScript file still saying `.key`.
+//
+// `key` remains the answer when there is nothing to read -- an entity with no Ref
+// message emits nothing that dereferences it, and a Ref with several oneofs has
+// already been warned about.
+func refOneof(files *protoregistry.Files, entity string) string {
+	const fallback = "key"
+	if files == nil {
+		return fallback
+	}
+	d, err := files.FindDescriptorByName(protoreflect.FullName(entity + "Ref"))
+	if err != nil {
+		return fallback
+	}
+	md, ok := d.(protoreflect.MessageDescriptor)
+	if !ok {
+		return fallback
+	}
+	o := soleOneof(md)
+	if o == nil {
+		return fallback
+	}
+	return toCamel(string(o.Name()))
+}
+
+// soleOneof is a message's only oneof, or nil if it has none or several.
+//
+// Several is not a case to pick a winner in. Which one holds the lookups would
+// be a guess, and a guess here produces output that compiles and queries the
+// wrong field, so it is reported rather than resolved -- by the caller, which
+// knows what it was looking for.
+func soleOneof(md protoreflect.MessageDescriptor) protoreflect.OneofDescriptor {
+	os := md.Oneofs()
+	if os.Len() != 1 {
+		return nil
+	}
+	return os.Get(0)
 }
 
 // orderedServices is the services in the order they were collected, which is

@@ -29,6 +29,32 @@ The silent ones are the ones to watch. An entity whose service is named anything
 other than `<Entity>Service` is modelled, validated, and then simply not served —
 no error, no output, nothing to notice.
 
+### The `<Entity>Ref` oneof: exactly one, name up to you — but it ends up in the output
+
+calque does not look this oneof up by name. It takes the message's **only** oneof,
+and a `Ref` carrying two is refused by the Go target and warned about by the
+TypeScript one, because which of them holds the lookups would be a guess.
+
+What the name *does* do is appear in the generated code, in both languages:
+
+```go
+switch x.WhichKey() {        // oneof key   → WhichKey
+switch x.WhichLookup() {     // oneof lookup → WhichLookup
+```
+
+```ts
+if(req.ref?.key === undefined) …      // oneof key
+if(req.ref?.lookup === undefined) …   // oneof lookup
+```
+
+So it is free to choose and not free to change: renaming it regenerates every
+place that dereferences it, which is correct and is a diff. Both targets derive it
+from the descriptor, so they cannot disagree — `testdata/proto/refoneof` is a copy
+of the fixture contract with the oneof renamed, and the tests assert exactly that.
+
+`key` is what the deployment this was measured against uses, and what calque falls
+back to when there is no `Ref` message to read.
+
 ### And what is *not* name-bound
 
 Read off the descriptor by type or position, so you may name these whatever you
@@ -36,7 +62,6 @@ like:
 
 - the wrapper message for a non-field key (`<Entity>RefBySlug` and friends) — it
   is found as the message type of the oneof member
-- the oneof itself — the first oneof on `<Entity>Ref` is used
 - the `ref` and `select` field names on the get request — found by type
 
 ## The patch companions, and why they exist
