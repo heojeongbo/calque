@@ -13,6 +13,7 @@ package dexie
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/HeoJeongBo/calque/gen"
@@ -36,6 +37,20 @@ type Options struct {
 	// reverted code cannot open. Fixing it is a planned forward migration, not
 	// something to smuggle into a generator swap.
 	Compat string `yaml:"compat"`
+
+	// Accept is the capability shortfalls to warn about rather than refuse,
+	// named one at a time.
+	//
+	// It exists because turning the spelling on and refusing what the store
+	// cannot hold are two different decisions, and the schema this was built
+	// against needs the first without the second: nine of its unique compound
+	// indexes are real constraints that SQL enforces and a browser cache simply
+	// cannot mirror. Dropping `unique` to silence them would delete the
+	// constraint from the database that does hold it.
+	//
+	// A list rather than a boolean, because a boolean would also accept the
+	// next shortfall, of some other kind, that nobody has looked at.
+	Accept []string `yaml:"accept"`
 }
 
 const (
@@ -67,6 +82,20 @@ func (b *Backend) Configure(cfg *gen.Config, section string) error {
 	default:
 		return fmt.Errorf("dexie: compat %q is not %q or %q", opts.Compat, CompatORMTS, CompatNone)
 	}
+
+	// A misspelled kind would accept nothing and look like it accepted
+	// something, which is the failure mode this whole option exists to avoid.
+	known := map[string]bool{}
+	for _, k := range gen.AllShortfallKinds() {
+		known[string(k)] = true
+	}
+	for _, name := range opts.Accept {
+		if !known[name] {
+			return fmt.Errorf("dexie: accept %q is not a shortfall kind\n\tcalque knows: %s",
+				name, strings.Join(gen.ShortfallKindNames(), ", "))
+		}
+	}
+
 	b.opts = opts
 	return nil
 }
@@ -77,6 +106,18 @@ func (b *Backend) Configure(cfg *gen.Config, section string) error {
 // has a unique compound index, which is not a migration anyone can perform. The
 // shortfall is still computed and reported; it just does not stop the build.
 func (b *Backend) Strict() bool { return b.opts.Compat == CompatNone }
+
+// Accepts refines Strict per kind.
+//
+// Compat mode accepts everything by definition -- reproducing a generator means
+// not refusing what it produced. Once the spelling is fixed, only what the
+// config named is let through, and anything else stops the build.
+func (b *Backend) Accepts(kind gen.ShortfallKind) bool {
+	if !b.Strict() {
+		return true
+	}
+	return slices.Contains(b.opts.Accept, string(kind))
+}
 
 // Capabilities states what IndexedDB can hold, not what calque wishes it could.
 func (b *Backend) Capabilities() gen.Capabilities {
@@ -118,12 +159,14 @@ func (v storePathVisitor) VisitEdge(e *schema.Edge) (schema.StorePath, error) {
 	if e.Target() == nil || e.Target().Key() == nil {
 		return nil, fmt.Errorf("dexie: %s points at an entity with no key", e.Name())
 	}
-	// The target's key component keeps its proto name in both modes: it is read
-	// off the embedded ref, whose shape protoc-gen-es derives from the same
-	// descriptor, and the corpus has no multi-word key to tell them apart.
+	// Both components go through name(). The second one is read off the embedded
+	// ref, which protoc-gen-es builds from the same descriptor and therefore
+	// gives the same JSON name -- so spelling it with the proto name was the
+	// same mistake as the first component, hidden by a corpus whose every key is
+	// `id`.
 	return schema.StorePath{
 		schema.StoreName(name(e, v.compat)),
-		schema.StoreName(e.Target().Key().Name()),
+		schema.StoreName(name(e.Target().Key(), v.compat)),
 	}, nil
 }
 
@@ -201,7 +244,11 @@ func (b *Backend) Lower(s *schema.Schema) (*gen.Lowered, error) {
 // uniqueness silently disappears; Capabilities says so and the run reports it.
 func (b *Backend) SchemaString(e *schema.Entity) (string, error) {
 	var sb strings.Builder
-	sb.WriteString("&" + string(e.Key().Name()))
+	// The key goes through name() like everything else. It reads as though it
+	// could not matter -- every key in the corpus is `id` -- but a multi-word
+	// key would have been spelled wrong even with compat off, which is the one
+	// place this bug could have survived the fix.
+	sb.WriteString("&" + name(e.Key(), b.compat()))
 
 	for _, key := range e.Keys() {
 		if key == schema.Elem(e.Key()) {
@@ -230,7 +277,7 @@ func (v keyPartVisitor) VisitEdge(e *schema.Edge) (string, error) {
 	if e.Target() == nil || e.Target().Key() == nil {
 		return "", fmt.Errorf("%s points at an entity with no key", e.Name())
 	}
-	return "&" + name(e, v.compat) + "." + string(e.Target().Key().Name()), nil
+	return "&" + name(e, v.compat) + "." + name(e.Target().Key(), v.compat), nil
 }
 
 func (v keyPartVisitor) VisitIndex(idx *schema.Index) (string, error) {
@@ -257,7 +304,7 @@ func (v indexMemberVisitor) VisitEdge(e *schema.Edge) (string, error) {
 	if e.Target() == nil || e.Target().Key() == nil {
 		return "", fmt.Errorf("%s points at an entity with no key", e.Name())
 	}
-	return name(e, v.compat) + "." + string(e.Target().Key().Name()), nil
+	return name(e, v.compat) + "." + name(e.Target().Key(), v.compat), nil
 }
 
 func (b *Backend) compat() bool { return b.opts.Compat == CompatORMTS }

@@ -85,13 +85,17 @@ func Run(s *schema.Schema, cfg *Config, r *Registry, options ...RunOption) (*Out
 	for _, p := range plan {
 		opts.progress.TargetStart(p.entry.Label(), p.backend.Name())
 
-		// Facts first, then policy. A backend that is not strict still has the
-		// shortfall computed and reported; it just does not stop.
-		if err := CheckCapabilities(s, p.backend); err != nil {
-			if p.backend.Strict() {
-				return nil, fmt.Errorf("%s: %w", p.entry.Label(), err)
-			}
-			fmt.Fprintf(opts.warn, "calque: %s: %v\n", p.entry.Label(), err)
+		// Facts first, then policy. Every shortfall is computed and reported
+		// whatever happens to it; the backend only decides which ones stop the
+		// run. An accepted one still goes to stderr on every build, because a
+		// constraint the store cannot hold does not stop being worth saying
+		// once someone has agreed to live with it.
+		accepted, refused := CheckCapabilities(s, p.backend).Partition(p.backend)
+		if len(refused) > 0 {
+			return nil, fmt.Errorf("%s: %w", p.entry.Label(), refused.Err())
+		}
+		if len(accepted) > 0 {
+			fmt.Fprintf(opts.warn, "calque: %s: %v\n", p.entry.Label(), accepted.Err())
 		}
 
 		lowered, err := p.backend.Lower(s)

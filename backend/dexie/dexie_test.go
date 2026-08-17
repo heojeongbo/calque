@@ -207,3 +207,56 @@ func TestLowerCarriesTheSchemaString(t *testing.T) {
 	tenant, _ := entity(t, s, "apptest.User").Prop("tenant")
 	require.Equal(t, schema.StorePath{"tenant", "id"}, table.Path[tenant])
 }
+
+// TestAcceptsIsPerKindOnceStrict: compat accepts everything by definition, and
+// once the spelling is fixed only what the config named gets through.
+func TestAcceptsIsPerKindOnceStrict(t *testing.T) {
+	compat := configured(t, dexie.CompatORMTS)
+	for _, k := range gen.AllShortfallKinds() {
+		require.True(t, compat.Accepts(k),
+			"reproducing a generator means not refusing what it produced: %s", k)
+	}
+
+	strict := configured(t, dexie.CompatNone)
+	for _, k := range gen.AllShortfallKinds() {
+		require.False(t, strict.Accepts(k), "nothing named, nothing accepted: %s", k)
+	}
+}
+
+func TestAcceptNamesOneKind(t *testing.T) {
+	b := dexie.New()
+	cfg, err := gen.ParseConfig([]byte(`
+version: 1
+targets:
+  - {target: ts, backend: dexie}
+dexie:
+  compat: none
+  accept:
+    - unique_compound_index
+`), "calque.yaml")
+	require.NoError(t, err)
+	require.NoError(t, b.Configure(cfg, "dexie"))
+
+	require.True(t, b.Accepts(gen.ShortfallUniqueCompoundIndex))
+	require.False(t, b.Accepts(gen.ShortfallBinaryKey),
+		"a list accepts what it lists; a boolean would have accepted this too")
+}
+
+// TestAcceptKindIsChecked: a misspelled kind would accept nothing while looking
+// like it accepted something, which is the failure this option exists to avoid.
+func TestAcceptKindIsChecked(t *testing.T) {
+	b := dexie.New()
+	cfg, err := gen.ParseConfig([]byte(`
+version: 1
+targets:
+  - {target: ts, backend: dexie}
+dexie:
+  accept: [uniqe_compound_index]
+`), "calque.yaml")
+	require.NoError(t, err)
+
+	err = b.Configure(cfg, "dexie")
+	require.ErrorContains(t, err, `accept "uniqe_compound_index"`)
+	require.ErrorContains(t, err, "calque knows:")
+	require.ErrorContains(t, err, "unique_compound_index")
+}

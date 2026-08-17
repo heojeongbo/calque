@@ -172,14 +172,19 @@ func TestRunEmitsPerTarget(t *testing.T) {
 func TestDocumentStoreRefusesUniqueCompoundIndex(t *testing.T) {
 	s := fixtureSchema(t)
 
-	require.NoError(t, gen.CheckCapabilities(s, relationalStore()),
+	require.Empty(t, gen.CheckCapabilities(s, relationalStore()),
 		"a store that holds a unique compound index has nothing to complain about")
 
-	err := gen.CheckCapabilities(s, documentStore())
+	found := gen.CheckCapabilities(s, documentStore())
+	err := found.Err()
 	require.Error(t, err, "silently dropping the constraint is the bug this exists to prevent")
 	require.ErrorContains(t, err, "cannot enforce a unique index over 2 properties")
 	require.ErrorContains(t, err, "would be created and would not be unique")
 	require.ErrorContains(t, err, "apptest.User.{indexes}(slug)")
+
+	// The kind is what a config names to accept it, so it has to be the one the
+	// check actually reports.
+	require.Equal(t, gen.ShortfallUniqueCompoundIndex, found[0].Kind)
 }
 
 func TestRunRefusesBeforeEmitting(t *testing.T) {

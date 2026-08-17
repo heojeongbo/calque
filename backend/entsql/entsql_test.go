@@ -33,7 +33,7 @@ func entity(t *testing.T, s *schema.Schema, name string) *schema.Entity {
 // about, from the other side.
 func TestHoldsWhatDexieCannot(t *testing.T) {
 	s := parse(t, "apptest.proto")
-	require.NoError(t, gen.CheckCapabilities(s, entsql.New()),
+	require.Empty(t, gen.CheckCapabilities(s, entsql.New()),
 		"ent writes index.Fields(...).Edges(...).Unique() and the database holds it")
 
 	caps := entsql.New().Capabilities()
