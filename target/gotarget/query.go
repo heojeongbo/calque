@@ -24,14 +24,23 @@ var (
 // `StationRef_Device_case` is protoc-gen-go's own constant. Three spellings of
 // one thing in one line, and only one of them could be guessed.
 func (e *emitter) emitQuery() error {
-	sources := e.gen.Sources()
-	if len(sources) == 0 {
+	// Everything here is written in terms of the Ref message, and a Ref message
+	// is part of the service contract. An entity nothing serves does not have
+	// one -- it is still modelled, and still a valid edge target, but there is
+	// no name for a caller to look it up by and so nothing to write.
+	var served []*schema.Entity
+	for _, en := range e.gen.Sources() {
+		if _, ok := e.service(en); ok {
+			served = append(served, en)
+		}
+	}
+	if len(served) == 0 {
 		return nil
 	}
 
-	f, ok := e.file(sources[0])
+	f, ok := e.file(served[0])
 	if !ok {
-		return fmt.Errorf("go: %s: no protogen file", sources[0].FullName())
+		return fmt.Errorf("go: %s: no protogen file", served[0].FullName())
 	}
 	dir := string(f.GoImportPath)
 	gf := e.pg.NewGeneratedFile(dir+"/query.g.go", f.GoImportPath)
@@ -40,7 +49,7 @@ func (e *emitter) emitQuery() error {
 	gf.P("package ", lastSegment(dir))
 	gf.P()
 
-	for _, en := range sources {
+	for _, en := range served {
 		if err := e.emitEntityQuery(gf, en); err != nil {
 			return fmt.Errorf("go: %s: %w", en.FullName(), err)
 		}

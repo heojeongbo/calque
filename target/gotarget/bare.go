@@ -41,6 +41,9 @@ type bare struct {
 	predPkg protogen.GoImportPath
 
 	methods map[schema.Op]*protogen.Method
+
+	// needsKey is whether anything resolves a reference to this entity's key.
+	needsKey bool
 }
 
 // emitBare writes one server file per proto file.
@@ -81,6 +84,37 @@ func (e *emitter) emitBare() error {
 	}
 	if len(groups) == 0 {
 		return nil
+	}
+
+	// XGetKey resolves a reference to the key it names, and its callers are
+	// always some *other* entity's Add or Patch writing an edge. The generator
+	// this reproduces emitted it with the entity's own patch, which is a
+	// different condition and not always the same set: an entity that is an
+	// edge target and declares only `get` gets called and not generated.
+	//
+	// The two coincide on the schema this was measured against, so widening the
+	// condition changes nothing there and fixes the case where they do not. An
+	// unused exported function is a smaller problem than a missing one.
+	var all []*bare
+	for _, grp := range groups {
+		all = append(all, grp.entries...)
+	}
+	needs := map[string]bool{}
+	for _, b := range all {
+		if _, ok := b.methods[schema.OpPatch]; ok {
+			needs[b.entity.FullName()] = true
+		}
+		_, add := b.methods[schema.OpAdd]
+		_, patch := b.methods[schema.OpPatch]
+		if !add && !patch {
+			continue
+		}
+		for _, edge := range b.entity.Edges() {
+			needs[edge.Target().FullName()] = true
+		}
+	}
+	for _, b := range all {
+		b.needsKey = needs[b.entity.FullName()]
 	}
 
 	for _, grp := range groups {
@@ -182,13 +216,8 @@ func (e *emitter) emitBareEntity(gf *protogen.GeneratedFile, b *bare) error {
 		if err := e.emitPatch(gf, b, m); err != nil {
 			return err
 		}
-		// GetKey exists to resolve an edge target's reference to its key, so a
-		// caller is another entity's Add or Patch -- but it is emitted with
-		// *this* entity's patch, which is not the same condition. An entity
-		// that is an edge target and declares only `get` is referenced by code
-		// that was never generated. Nothing in the measured schema is in that
-		// position; reproducing the condition rather than the intent keeps the
-		// output identical and leaves the trap documented.
+	}
+	if b.needsKey {
 		if err := e.emitGetKey(gf, b); err != nil {
 			return err
 		}
