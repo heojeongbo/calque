@@ -23,6 +23,7 @@ import (
 	"github.com/heojeongbo/calque/gen"
 	"github.com/heojeongbo/calque/plugin"
 	"github.com/heojeongbo/calque/target/gotarget"
+	"github.com/heojeongbo/calque/target/service"
 	"github.com/heojeongbo/calque/target/ts"
 )
 
@@ -34,6 +35,7 @@ func registry() *gen.Registry {
 	return gen.NewRegistry().
 		Target(ts.New()).
 		Target(gotarget.New()).
+		Target(service.New()).
 		Backend(dexie.New()).
 		Backend(entsql.New())
 }
