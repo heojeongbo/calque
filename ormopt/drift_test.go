@@ -2,6 +2,8 @@ package ormopt_test
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -73,6 +75,43 @@ func TestGeneratedMatchesProto(t *testing.T) {
 
 	assertSameShape(t, source, shapeOfFiles(linked),
 		"ormopt is stale; run `go run ./tools/gen-ormopt` and commit the result")
+}
+
+// TestGoPackageMatchesModule pins every vendored proto's go_package to this
+// module's path.
+//
+// It is not a style check. protoc-gen-go is told `module=<this module>` and
+// refuses any file whose go_package does not sit under that prefix, so a
+// mismatch does not produce wrong Go -- it produces no Go at all, and only when
+// someone next runs `go run ./tools/gen-ormopt`, which may be months later.
+// Renaming the module and forgetting these six lines is how that happens; it
+// already did once, and the module path is case-sensitive, so a rename that
+// only changes capitalisation counts.
+func TestGoPackageMatchesModule(t *testing.T) {
+	mod, err := os.ReadFile("../go.mod")
+	require.NoError(t, err)
+
+	var module string
+	for line := range strings.Lines(string(mod)) {
+		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), "module "); ok {
+			module = strings.TrimSpace(rest)
+			break
+		}
+	}
+	require.NotEmpty(t, module, "no module line in go.mod")
+
+	want := module + "/ormopt"
+
+	files, err := filepath.Glob("../proto/calque/orm/*.proto")
+	require.NoError(t, err)
+	require.NotEmpty(t, files)
+
+	for _, path := range files {
+		src, err := os.ReadFile(path)
+		require.NoError(t, err)
+		require.Contains(t, string(src), `option go_package = "`+want+`";`,
+			"%s: go_package must be %q, or gen-ormopt cannot run", path, want)
+	}
 }
 
 // assertSameShape compares two vocabularies key by key, so a failure names the

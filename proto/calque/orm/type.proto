@@ -2,7 +2,7 @@ edition = "2023";
 
 package calque.orm;
 
-option go_package = "github.com/HeoJeongBo/calque/ormopt";
+option go_package = "github.com/heojeongbo/calque/ormopt";
 
 // Type is the storage type of a field.
 //

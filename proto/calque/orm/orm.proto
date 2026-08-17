@@ -25,7 +25,7 @@ package calque.orm;
 import "calque/orm/options.proto";
 import "google/protobuf/descriptor.proto";
 
-option go_package = "github.com/HeoJeongBo/calque/ormopt";
+option go_package = "github.com/heojeongbo/calque/ormopt";
 
 extend google.protobuf.MessageOptions {
   MessageOptions message = 45001;

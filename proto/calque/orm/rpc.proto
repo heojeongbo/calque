@@ -2,7 +2,7 @@ edition = "2023";
 
 package calque.orm;
 
-option go_package = "github.com/HeoJeongBo/calque/ormopt";
+option go_package = "github.com/heojeongbo/calque/ormopt";
 
 message RpcAdd {
   bool disabled = 1;

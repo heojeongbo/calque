@@ -7,7 +7,7 @@ import "calque/orm/ref.proto";
 import "calque/orm/rpc.proto";
 import "calque/orm/type.proto";
 
-option go_package = "github.com/HeoJeongBo/calque/ormopt";
+option go_package = "github.com/heojeongbo/calque/ormopt";
 
 message RpcOptions {
   bool disabled = 1;
