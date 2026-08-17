@@ -72,8 +72,7 @@ and the diff is empty.
 | | |
 |---|---|
 | **TypeScript**, on Dexie | **complete** — 28 of 28 files byte-identical |
-| **Go**, ent schema and `Proto()` | **complete** — 26 of 26 files byte-identical |
-| **Go**, server and query code | **in progress** — see [docs/targets/go.md](docs/targets/go.md) |
+| **Go**, on ent and SQL | **complete** — 42 of 42 files byte-identical, and the replaced tree's own test suites pass against the generated code |
 
 The two npm runtime packages are published from [`ts/`](ts). Everything else has
 no dependencies beyond the Go module: `go test ./...` compiles protos in
