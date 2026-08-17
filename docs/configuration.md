@@ -110,7 +110,6 @@ to make a browser cache generate:
 dexie:
   compat: none
   accept:
-    - unique_compound_index
     - binary_key
 ```
 

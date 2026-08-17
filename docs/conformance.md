@@ -68,25 +68,41 @@ operations exist is a property of the schema. `TestPlansCoverDeclaredRpcs`
 fails if a declared operation has no plan. A target that cannot implement an
 operation says so at generate time; it does not emit a smaller interface.
 
-## 3. Uniqueness — a constraint the store will not hold is not a constraint
+## 3. Uniqueness — a constraint nobody asked the store for
 
-This is the sharpest divergence, and the one with a paper trail.
+This is the sharpest divergence, the one with a paper trail, and the one this
+document got wrong twice.
 
-A unique index over a field and an edge is enforced by ent as a real unique
-index on the foreign-key column. Dexie has no unique form of a compound index,
-so the same declaration is emitted as a plain compound index and **the
-uniqueness is silently dropped**. Nothing warns.
+A unique index over a field and an edge is enforced by ent as a real unique index
+on the foreign-key column. `protoc-gen-orm-ts` emitted the same declaration as
+`[alias+tenant.id]` — no `&` — so **the uniqueness was silently dropped**.
+Nothing warned.
 
 It has already cost something. The consuming application carries a database
 version bump whose comment records restoring a compound index that had been
 dropped "while the `sequence` index was briefly non-unique". That is this exact
 failure, found in production and fixed by hand.
 
-**calque:** `Capabilities.UniqueCompoundIndex` is false for a document store, and
-`gen/capability.go` **refuses to generate**, naming the index and saying what
-to do — drop `unique`, or opt in to runtime enforcement and pay for a
-transaction on every write. A generator that silently gives you a weaker
-guarantee than you asked for is worse than one that stops.
+**What this document used to say** was that Dexie has no unique form of a
+compound index, so the constraint was unholdable and the only honest thing to do
+was refuse. That was an inference from the output, and it was wrong. Dexie
+decides `unique` from `&` and `compound` from whether the key path is an array,
+independently; nothing forbids the combination; and `createIndex` receives
+`unique: true` with the array key path, which IndexedDB enforces. `&[a+b]` works.
+It is measured in `ts/packages/dexie`: two rows with the same pair, and a
+`ConstraintError`.
+
+So the constraint was never unholdable. It was unasked for.
+
+**calque:** every part of a Dexie schema string comes from `Entity.Keys()`, which
+yields only unique elements, so every part is marked `&` — `&alias` for one
+member, `&[alias+tenant.id]` for several. One assertion checks it, which is what
+the earlier version of this item lacked.
+
+A store that genuinely cannot hold a constraint still stops the build, and
+`dexie.accept` is how a cache says it will live with one the store of record
+holds instead. That mechanism was built for the nine indexes described above,
+and none of them needed it.
 
 ## 4. Names — a store key and a message property are different names
 

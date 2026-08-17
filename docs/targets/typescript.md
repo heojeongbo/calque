@@ -110,19 +110,27 @@ that knows its syntax.
 | the key | `&id` |
 | a unique field | `&alias` |
 | a unique edge | `&tenant.id` |
-| a unique index | `[alias+tenant.id]` — brackets even for one member |
+| a unique index, one member | `&deviceId` |
+| a unique index, several | `&[alias+tenant.id]` |
 
-Built from `Entity.Keys()`, which is every unique element. Two consequences:
+Built from `Entity.Keys()`, which is every unique element — so **every part is
+marked `&`**, and a test asserts it. The brackets say how many members there are;
+the `&` says the index is unique. They are separate axes, and
+`protoc-gen-orm-ts` ran them together: it always bracketed and never marked
+unique, which broke both directions at once.
 
-- **A non-unique index is not emitted at all.** It is not a lookup, so it is not
-  in `Keys()`.
-- **A unique compound index is emitted without the `&`.** Dexie has no unique
-  form of a compound index. The index is created and it is not unique.
+- **A one-member index in compound syntax cannot be queried.** `[deviceId]`
+  registers under that name, and `where({deviceId})` takes Dexie's single-key
+  branch, which looks an index up by the name `deviceId`. Declared, unfindable.
+- **A multi-member one was not unique.** Queryable — that branch searches by key
+  path — but the constraint was gone.
 
-That second one is conformance item 3, and it has already cost something in
-production. calque will not do it silently: `dexie.compat: none` makes it an
-error naming the index. See [Migrating](../migrating.md) for why the default is
-still to reproduce it.
+Both are conformance item 3, reproduced under `compat: orm-ts` and fixed under
+`compat: none`.
+
+**A non-unique index is not emitted at all**, in either mode: it is not a lookup,
+so it is not in `Keys()`. A query that expects it will table-scan and nothing
+says so.
 
 ## `compat: orm-ts`
 
@@ -165,8 +173,7 @@ index generates nothing at all.
 dexie:
   compat: none
   accept:
-    - unique_compound_index   # SQL holds it; a browser cache cannot mirror it
-    - binary_key
+    - binary_key   # a unique `bytes` field IndexedDB will not index
 ```
 
 A list rather than a boolean, because a boolean also accepts the next shortfall,

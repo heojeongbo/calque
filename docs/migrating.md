@@ -141,7 +141,7 @@ Each of these is a measured divergence from
 | | |
 |---|---|
 | index spellings | `dexie.compat: none`. The index that was declared under a name no row has starts working |
-| unique compound indexes | `compat: none` refuses them rather than creating a non-unique index. Accept `unique_compound_index` if another store holds the constraint and this one is a cache; dropping `unique` would delete it from the store that does hold it |
+| unique indexes | `compat: none` marks them `&`, so they start being enforced. If the existing cache holds rows that violate one, the upgrade fails — which is why the recovery below is not optional |
 
 Plan the rollback *first*, because a Dexie version cannot be lowered and there
 is probably nothing in the app that can recover from `VersionError`. If the
