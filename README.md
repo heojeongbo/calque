@@ -74,9 +74,12 @@ and the diff is empty.
 | **TypeScript**, on Dexie | **complete** — 28 of 28 files byte-identical |
 | **Go**, on ent and SQL | **complete** — 42 of 42 files byte-identical, and the replaced tree's own test suites pass against the generated code |
 
-The two npm runtime packages are published from [`ts/`](ts). Everything else has
-no dependencies beyond the Go module: `go test ./...` compiles protos in
-process, so there is no protoc and no buf in the test path.
+The two npm runtime packages are published from [`ts/`](ts). There is no Go
+equivalent and none is needed — ent already is that layer, so the generated Go
+depends on calque for nothing at run time
+([why](docs/targets/go.md#runtime)). Everything else has no dependencies beyond
+the Go module: `go test ./...` compiles protos in process, so there is no protoc
+and no buf in the test path.
 
 ## Documentation
 

@@ -146,6 +146,52 @@ initialism in them.
 `func.go` out of the module cache and fails if the two have drifted, so the copy
 cannot quietly go stale.
 
+## Runtime
+
+There is no calque runtime for Go, and nothing to install. The generated code
+imports only what it stores into and speaks over:
+
+| | |
+|---|---|
+| the standard library | `bytes`, `context`, `time` |
+| [ent](https://entgo.io) | `entgo.io/ent` and its `schema`, `dialect/entsql`, `dialect/sql/sqlgraph` packages |
+| gRPC | `google.golang.org/grpc`, and `codes`/`status` in the servers |
+| protobuf | `protojson`, `timestamppb` |
+| uuid | `github.com/google/uuid`, for a uuid key |
+| your own package | the `.pb.go` types and ent's generated client |
+
+That list is the complete set across the golden corpus, taken from it rather than
+written from memory. A table in prose goes stale silently, so here is how it was
+got:
+
+```sh
+grep -rhoE '^\t[a-z0-9_]* "[^"]+"' target/gotarget/testdata/golden/ |
+	sed 's/.*"\(.*\)"/\1/' | sort -u
+```
+
+**ent is the runtime.** The TypeScript target needs
+[`@heojeongbo/calque-dexie`](typescript.md#runtime) because Dexie is a thin index
+API with no idea what a message is, so something has to hold the dehydrate,
+hydrate, compare and reconcile logic. ent already generates a typed client per
+entity, so the equivalent code has somewhere to be: it is emitted per entity —
+`Proto()` in the ent package, and the helpers inside each bare server — rather
+than shared in a library.
+
+### What follows from that
+
+**There is no version contract on this side.** The only way generated Go changes
+is regeneration, so the generator's version and the emitted code cannot disagree.
+
+The TypeScript side has a second axis: generated code and the runtime package have
+to agree, and a runtime released separately can change behaviour under output that
+did not move. `TableBase._reconcile` is the worked example — see
+[conformance item 5](../conformance.md) and the version note on
+[`TableBase`](typescript.md#tablebase).
+
+Neither arrangement is better in the abstract. It is worth knowing which one you
+are in, because it decides whether upgrading calque can change anything without a
+regeneration. Here it cannot.
+
 ## Configuration
 
 | key | default | |

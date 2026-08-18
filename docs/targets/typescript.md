@@ -203,6 +203,13 @@ pnpm add @heojeongbo/calque-dexie dexie @bufbuild/protobuf @connectrpc/connect
 your app already has them and the generated code has to agree with the copy it
 has.
 
+**The Go target has no equivalent, and that is not an omission.** Dexie is a thin
+index API with no idea what a message is, so the dehydrate/hydrate/compare layer
+has to live in a package; ent generates a typed client per entity, so on that side
+the same code has somewhere to be and is emitted per entity instead. The
+consequence is a version contract that exists here and not there — see
+[the Go target's Runtime section](go.md#runtime).
+
 ### `TableBase`
 
 `_query`, `_insert`, `_reconcile`, `_compare`, `_clone`, plus the `_dehydrate`
