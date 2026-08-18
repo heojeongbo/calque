@@ -95,6 +95,7 @@ and no buf in the test path.
 | [Go target](docs/targets/go.md) | what it emits today, and what it does not yet |
 | [Migrating](docs/migrating.md) | coming from `protoc-gen-orm-ts` or `protoc-gen-orm-ent` |
 | [Conformance](docs/conformance.md) | what two targets have to agree about, measured |
+| [Versioning](docs/versioning.md) | three version numbers that are not the same number, and which one can change behaviour without a regeneration |
 | [Development](docs/development.md) | running the tests, and what each one is for |
 
 ## License

@@ -227,6 +227,10 @@ It did not until v0.2.0: the comparison's result was discarded and the method
 always resolved `true`, which was conformance item 5. Upgrading a consumer that
 already had that branch makes it live for the first time.
 
+This is the one calque version that can do that — see
+[Versioning](../versioning.md), which is also where to look if you are wondering
+why the runtime is on 0.2.0 while the plugin is on 0.6.0.
+
 ## Configuration
 
 | key | default | |

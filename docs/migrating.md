@@ -227,6 +227,9 @@ from what is there.
 
 **Needs a code change, not just a regeneration:**
 
+These are the runtime's, not the plugin's, and the distinction decides how they
+reach you — see [Versioning](versioning.md).
+
 | | |
 |---|---|
 | `_reconcile` always returning true | **fixed in `@heojeongbo/calque-dexie` v0.2.0.** Callers that check its result have never taken the `false` branch; upgrading makes those branches live for the first time |
