@@ -24,11 +24,9 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
-		"release": "release-it",
-		"release:patch": "release-it patch",
-		"release:minor": "release-it minor",
-		"release:major": "release-it major",
-		"release:dry": "release-it --dry-run"
+		"prepublishOnly": "pnpm build",
+		"release": "pnpm publish --access public",
+		"release:dry": "pnpm publish --access public --dry-run"
 	},
 	"keywords": [
 		"calque",
