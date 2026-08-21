@@ -215,26 +215,15 @@ func (b *Backend) Lower(s *schema.Schema) (*gen.Lowered, error) {
 
 		t := &gen.Table{
 			Entity: e,
-			// The store name is the entity's full proto name, which the
-			// consuming cache also derives by stripping "Service" from a
-			// service name. Nothing enforces that coincidence; see the warning
-			// the TypeScript target emits.
-			Name:  e.FullName(),
-			Path:  map[schema.Prop]schema.StorePath{},
-			Codec: map[schema.Prop]gen.CodecName{},
-			Extra: map[string]any{"stores": stores},
+			Codec:  map[schema.Prop]gen.CodecName{},
+			Extra:  map[string]any{"stores": stores},
 		}
 
 		for _, p := range e.Props() {
-			path, err := b.StorePath(p)
-			if err != nil {
-				return nil, fmt.Errorf("dexie: %s.%s: %w", e.FullName(), p.Name(), err)
-			}
 			codec, err := b.Codec(p)
 			if err != nil {
 				return nil, fmt.Errorf("dexie: %s.%s: %w", e.FullName(), p.Name(), err)
 			}
-			t.Path[p] = path
 			t.Codec[p] = codec
 		}
 

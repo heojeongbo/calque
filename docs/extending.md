@@ -143,7 +143,21 @@ differently.
 ### `Lower`
 
 Turn the validated neutral schema into storage decisions: one `Table` per
-entity, with a name, a primary key, indexes, and a path and codec for every prop.
+entity, holding a codec for every prop and whatever else your runtime adapter
+needs, in `Extra`.
+
+`Table` is deliberately narrow, and it was not always. It used to carry a table
+name, a primary key, a list of indexes and a path per prop, modelled neutrally
+so a target could read them without knowing the store. No target ever did — the
+questions worth asking turned out to be store-specific, and they are asked the
+way [target-specific backend questions](#target-specific-backend-questions)
+describes. So do not populate a neutral description of your store for a reader
+that does not exist; expose what your target needs as a method on your backend,
+where it can have the right type.
+
+`Codec` is the one the core reads: `gen.Run` checks every entry against your
+`Capabilities`, and naming one you do not implement is an error saying it is a
+calque bug.
 
 Cover **`s.Entities()`**, not `s.Sources()`. An entity reachable only as an edge
 target is not emitted, but a target still asks what its key looks like.
@@ -208,7 +222,7 @@ claiming the same path is an error naming both, not last-one-wins.
 |---|---|
 | `Sources()` | the entities to emit, in stable order |
 | `Schema()` | every entity, including ones reachable only as an edge target |
-| `Table(e)` | the backend's decisions for one entity — name, paths, codecs, indexes |
+| `Table(e)` | the backend's decisions for one entity — its codecs, and its `Extra` |
 | `Lowered()` | all of them |
 | `Backend()` | the paired backend, for a target-specific question |
 | `Config()`, `Entry()` | the config, and this entry |

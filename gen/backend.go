@@ -127,60 +127,27 @@ type Backend interface {
 	Lower(s *schema.Schema) (*Lowered, error)
 }
 
-// Enforcement says who guarantees a constraint.
-type Enforcement string
-
-const (
-	// EnforceStore means the store holds the constraint itself.
-	EnforceStore Enforcement = "store"
-	// EnforceRuntime means the adapter must check inside the write
-	// transaction. It is only ever chosen by an explicit config opt-in,
-	// because it costs a transaction on every write.
-	EnforceRuntime Enforcement = "runtime"
-	// EnforceNone means nothing holds it. It is never chosen implicitly: a
-	// constraint nothing holds is a constraint the schema does not have.
-	EnforceNone Enforcement = "none"
-)
-
-// StoredIndex is one index as the store will create it.
-type StoredIndex struct {
-	// Name is the index's identity in the store and in a query plan's lookup.
-	Name string
-
-	// Members are the stored paths, in index order.
-	Members []schema.StorePath
-
-	Unique bool
-
-	// Partial narrows the index. For soft delete it is "the erased column is
-	// null", expressed neutrally.
-	Partial *schema.StorePath
-
-	// Enforcement says who guarantees Unique.
-	Enforcement Enforcement
-
-	// Source is the schema element this came from, for diagnostics. It is nil
-	// for an index the backend synthesized.
-	Source schema.Elem
-}
-
 // Table is one entity as one backend decided to store it.
+//
+// It is narrow, and it used to be wider. There were a table name, a primary
+// key, a list of indexes and a path per prop, modelled neutrally so that a
+// target could read a store's decisions without knowing which store. No target
+// ever did: both ask their own backend directly, because the questions worth
+// asking turned out to be store-specific ones — the ent identifier for a prop,
+// the Dexie schema string for an entity — and a neutral answer to a
+// store-specific question is a stub. Carrying the fields anyway meant every
+// backend maintained a second description of itself that nothing read, and a
+// mistake in it could not be caught by anything.
+//
+// What is left is what the core itself reads. See
+// docs/architecture.md#target-specific-backend-extensions for the seam that
+// replaced it.
 type Table struct {
 	Entity *schema.Entity
 
-	// Name is the storage-level table name.
-	Name string
-
-	PrimaryKey StoredIndex
-
-	// Indexes is every index the store will create, including ones promoted
-	// from a unique field.
-	Indexes []StoredIndex
-
-	// Path is where each prop's value lives.
-	Path map[schema.Prop]schema.StorePath
-
-	// Codec is the transform each prop's value goes through.
+	// Codec is the transform each prop's value goes through. Run checks every
+	// entry against the backend's own Capabilities, which is the one thing the
+	// core does with a lowering.
 	Codec map[schema.Prop]CodecName
 
 	// Extra is JSON-able and is emitted verbatim under the descriptor's

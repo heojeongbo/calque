@@ -63,22 +63,12 @@ func (b *fakeBackend) Codec(p schema.Prop) (gen.CodecName, error) {
 func (b *fakeBackend) Lower(s *schema.Schema) (*gen.Lowered, error) {
 	l := &gen.Lowered{Schema: s, Backend: b.name, Tables: map[*schema.Entity]*gen.Table{}}
 	for _, e := range s.Entities() {
-		table := &gen.Table{
-			Entity: e,
-			Name:   e.FullName(),
-			Path:   map[schema.Prop]schema.StorePath{},
-			Codec:  map[schema.Prop]gen.CodecName{},
-		}
+		table := &gen.Table{Entity: e, Codec: map[schema.Prop]gen.CodecName{}}
 		for _, p := range e.Props() {
-			path, err := b.StorePath(p)
-			if err != nil {
-				return nil, err
-			}
 			codec, err := b.Codec(p)
 			if err != nil {
 				return nil, err
 			}
-			table.Path[p] = path
 			table.Codec[p] = codec
 		}
 		l.Tables[e] = table

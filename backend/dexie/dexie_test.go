@@ -207,12 +207,24 @@ func TestLowerCarriesTheSchemaString(t *testing.T) {
 
 	table, err := l.Table(entity(t, s, "apptest.User"))
 	require.NoError(t, err)
-	require.Equal(t, "apptest.User", table.Name)
 	require.Equal(t, "&id,[alias+tenant.id]", table.Extra["stores"])
+}
 
-	// An edge's stored path reaches into the nested ref.
-	tenant, _ := entity(t, s, "apptest.User").Prop("tenant")
-	require.Equal(t, schema.StorePath{"tenant", "id"}, table.Path[tenant])
+// TestEdgeIsAPathNotAColumn is the other half of entsql's
+// TestEdgeIsAColumnNotAPath: the same edge, and the whole reason StorePath
+// returns a sequence rather than a string.
+//
+// It is a direct call because Lower no longer makes one. It used to, to fill a
+// per-prop path map that nothing read; asking the backend here is what keeps a
+// StorePath bug from having to be found in a golden diff.
+func TestEdgeIsAPathNotAColumn(t *testing.T) {
+	s := parse(t, "apptest.proto")
+	tenant, ok := entity(t, s, "apptest.User").Prop("tenant")
+	require.True(t, ok)
+
+	path, err := configured(t, dexie.CompatORMTS).StorePath(tenant)
+	require.NoError(t, err)
+	require.Equal(t, schema.StorePath{"tenant", "id"}, path)
 }
 
 // TestAcceptsIsPerKindOnceStrict: compat accepts everything by definition, and

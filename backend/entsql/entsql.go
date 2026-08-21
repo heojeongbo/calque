@@ -179,46 +179,16 @@ func (b *Backend) Lower(s *schema.Schema) (*gen.Lowered, error) {
 
 		t := &gen.Table{
 			Entity: e,
-			Name:   b.TableName(e),
-			Path:   map[schema.Prop]schema.StorePath{},
 			Codec:  map[schema.Prop]gen.CodecName{},
 			Extra:  map[string]any{"dialect": string(b.opts.Dialect)},
 		}
 
 		for _, p := range e.Props() {
-			path, err := b.StorePath(p)
-			if err != nil {
-				return nil, fmt.Errorf("entsql: %s.%s: %w", e.FullName(), p.Name(), err)
-			}
 			codec, err := b.Codec(p)
 			if err != nil {
 				return nil, fmt.Errorf("entsql: %s.%s: %w", e.FullName(), p.Name(), err)
 			}
-			t.Path[p] = path
 			t.Codec[p] = codec
-		}
-
-		key := gen.StoredIndex{
-			Name:        "PRIMARY",
-			Members:     []schema.StorePath{t.Path[e.Key()]},
-			Unique:      true,
-			Enforcement: gen.EnforceStore,
-			Source:      e.Key(),
-		}
-		t.PrimaryKey = key
-
-		for _, idx := range e.Indexes() {
-			members := make([]schema.StorePath, 0, len(idx.Props()))
-			for _, p := range idx.Props() {
-				members = append(members, t.Path[p])
-			}
-			t.Indexes = append(t.Indexes, gen.StoredIndex{
-				Name:        string(idx.Name()),
-				Members:     members,
-				Unique:      idx.IsUnique(),
-				Enforcement: gen.EnforceStore,
-				Source:      idx,
-			})
 		}
 
 		l.Tables[e] = t
