@@ -3,6 +3,7 @@
 package policy_test
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -22,7 +23,7 @@ var exempt = map[string]string{
 }
 
 // TestNoPanicInGenerationPaths refuses panic() anywhere calque reasons about a
-// schema.
+// schema, in either of the two ways it can be spelled.
 //
 // The predecessor had two, both spelled
 // `default: panic("unimplemented: key type not Field")`, guarding a type switch
@@ -35,12 +36,20 @@ var exempt = map[string]string{
 // exactly when the code stops being right. VisitElem and ElemVisitor exist so
 // that the same situation is a build failure; this test is what stops someone
 // reaching for the panic anyway.
+//
+// The second spelling is a call to something named Must or PanicIf. It is
+// checked separately because it is invisible to the first: `panic(...)` is an
+// *ast.Ident and `z.Use[T].Must(ctx)` is an *ast.SelectorExpr, so a commitment
+// this test appears to enforce could be given up without the test noticing.
+// The distinction that matters is not the spelling but when it runs -- see
+// initCalls.
 func TestNoPanicInGenerationPaths(t *testing.T) {
 	root, err := filepath.Abs("../..")
 	require.NoError(t, err)
 
 	fset := token.NewFileSet()
 	var offences []string
+	var musts []string
 
 	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -76,17 +85,22 @@ func TestNoPanicInGenerationPaths(t *testing.T) {
 			return parseErr
 		}
 
+		atInit := initCalls(f)
 		ast.Inspect(f, func(n ast.Node) bool {
 			call, ok := n.(*ast.CallExpr)
 			if !ok {
 				return true
 			}
-			ident, ok := call.Fun.(*ast.Ident)
-			if !ok || ident.Name != "panic" {
-				return true
+			switch fun := call.Fun.(type) {
+			case *ast.Ident:
+				if fun.Name == "panic" {
+					offences = append(offences, at(rel, fset, call))
+				}
+			case *ast.SelectorExpr:
+				if mustLike(fun.Sel.Name) && !atInit[call] {
+					musts = append(musts, at(rel, fset, call)+": "+selector(fun))
+				}
 			}
-			offences = append(offences,
-				rel+":"+fset.Position(call.Pos()).String()[len(path)+1:])
 			return true
 		})
 		return nil
@@ -98,6 +112,78 @@ func TestNoPanicInGenerationPaths(t *testing.T) {
 			"A switch with a panicking default keeps compiling when a variant is added,\n"+
 			"which is when it stops being right. Use schema.VisitElem with an\n"+
 			"ElemVisitor, or return a diagnostic, so the compiler or the user is told.")
+
+	require.Empty(t, musts,
+		"a Must or PanicIf call in a path that reasons about a schema.\n"+
+			"These panic by contract and the spelling hides it, which is worse than a\n"+
+			"bare panic rather than better. Read the value with the form that reports\n"+
+			"absence -- From rather than Must -- or return an error.\n"+
+			"A package-level var or const initialiser is exempt: it runs before there\n"+
+			"is a request to fail.")
+}
+
+// mustLike reports whether a name promises to panic rather than to report.
+//
+// It matches on the name and not on the function it resolves to, because this
+// test has to hold for a package the repository has not imported yet -- which
+// is the whole reason it exists. A function called Must that does not panic is
+// a worse problem than a false positive here.
+func mustLike(name string) bool {
+	return name == "PanicIf" || strings.HasPrefix(name, "Must")
+}
+
+// initCalls is every call in a package-level var or const initialiser.
+//
+// Those are exempt, and the reason is about when they run rather than about
+// what they do. `var nameRE = regexp.MustCompile(...)` runs once at process
+// start, before a request has been read: it cannot fail on a schema, and if
+// the pattern is wrong the binary never starts rather than dying halfway
+// through somebody's build.
+//
+// The walk stops at a func literal, because one inside an initialiser is not
+// initialisation -- it runs when it is called, which is exactly when a request
+// is in flight.
+func initCalls(f *ast.File) map[ast.Node]bool {
+	out := map[ast.Node]bool{}
+	for _, decl := range f.Decls {
+		gd, ok := decl.(*ast.GenDecl)
+		if !ok || (gd.Tok != token.VAR && gd.Tok != token.CONST) {
+			continue
+		}
+		for _, spec := range gd.Specs {
+			vs, ok := spec.(*ast.ValueSpec)
+			if !ok {
+				continue
+			}
+			for _, v := range vs.Values {
+				ast.Inspect(v, func(n ast.Node) bool {
+					if _, isLit := n.(*ast.FuncLit); isLit {
+						return false
+					}
+					if call, isCall := n.(*ast.CallExpr); isCall {
+						out[call] = true
+					}
+					return true
+				})
+			}
+		}
+	}
+	return out
+}
+
+// at is a position said the way an editor can follow it.
+func at(rel string, fset *token.FileSet, n ast.Node) string {
+	p := fset.Position(n.Pos())
+	return fmt.Sprintf("%s:%d:%d", rel, p.Line, p.Column)
+}
+
+// selector renders x.Sel when x is a plain identifier, which is enough to say
+// which call a position points at.
+func selector(e *ast.SelectorExpr) string {
+	if x, ok := e.X.(*ast.Ident); ok {
+		return x.Name + "." + e.Sel.Name
+	}
+	return e.Sel.Name
 }
 
 // TestGeneratedCodeIsMarked checks that every committed .pb.go says so, since
