@@ -122,15 +122,16 @@ were. Run both.
 | `ormopt/` | its generated Go, committed |
 | `ormcompat/` | annotations to schema specs |
 | `schema/` | the neutral IR: entities, props, indexes, names, diagnostics |
-| `query/` | the plan AST and `Derive`. Not yet called by any target |
 | `gen/` | the generator core: config, `Target`, `Backend`, capabilities, output |
 | `backend/dexie/`, `backend/entsql/` | storage decisions |
-| `target/ts/`, `target/gotarget/` | emission |
+| `target/ts/`, `target/gotarget/`, `target/service/` | emission |
+| `internal/policy/` | checks about the shape of the repository, not its behaviour |
 | `internal/tsw/` | a forty-line line writer |
 | `internal/prow/` | the same, for `.proto`, plus a depth |
 | `internal/entname/` | ent's casing, copied and pinned |
 | `internal/protoc/` | in-process proto compilation, for tests |
 | `plugin/` | the protoc-plugin boundary |
+| `tools/` | developer commands; `gen-ormopt` regenerates the vocabulary's Go |
 | `ts/` | the two npm runtime packages |
 
 ## Conventions
