@@ -15,27 +15,32 @@ import (
 
 // Serve reads a CodeGeneratorRequest, generates, and writes the response.
 //
-// The exit code is the plugin contract, and it is narrower than it looks. A
-// schema the user got wrong is reported as response.error with exit 0: buf
-// prints that message and fails the build itself. A non-zero exit is reserved
-// for not being able to read the request or write the response — the only
-// failure buf cannot explain on calque's behalf.
+// What it returns is the plugin contract, and it is narrower than it looks. A
+// schema the user got wrong is **not** an error here: it is written into
+// response.error and Serve returns nil, so the process exits 0 and buf prints
+// that message and fails the build itself. An error from Serve means the
+// request could not be read or the response could not be written — the only
+// failure buf cannot explain on calque's behalf, and the only one worth a
+// non-zero exit.
+//
+// It returns an error rather than an exit code because its caller is a command
+// among other commands now, and one of them printing "calque: ..." while the
+// others return is how two spellings of the same failure appear in one build
+// log. The caller decides; see package cmd.
 //
 // There is no `-check` and no exit code 3. A plugin cannot read its own output
 // directory (buf may be writing into an archive, and the plugin is never told
 // the root), so drift is a thing `go test` checks against committed goldens,
 // not something a plugin can discover about itself.
-func Serve(stdin io.Reader, stdout, stderr io.Writer, r *gen.Registry) int {
+func Serve(stdin io.Reader, stdout, stderr io.Writer, r *gen.Registry) error {
 	in, err := io.ReadAll(stdin)
 	if err != nil {
-		fmt.Fprintf(stderr, "calque: read request: %v\n", err)
-		return 1
+		return fmt.Errorf("read request: %w", err)
 	}
 
 	req := &pluginpb.CodeGeneratorRequest{}
 	if err := proto.Unmarshal(in, req); err != nil {
-		fmt.Fprintf(stderr, "calque: parse request: %v\n", err)
-		return 1
+		return fmt.Errorf("parse request: %w", err)
 	}
 
 	res := generate(req, r, stderr)
@@ -47,14 +52,12 @@ func Serve(stdin io.Reader, stdout, stderr io.Writer, r *gen.Registry) int {
 
 	out, err := proto.Marshal(res)
 	if err != nil {
-		fmt.Fprintf(stderr, "calque: marshal response: %v\n", err)
-		return 1
+		return fmt.Errorf("marshal response: %w", err)
 	}
 	if _, err := stdout.Write(out); err != nil {
-		fmt.Fprintf(stderr, "calque: write response: %v\n", err)
-		return 1
+		return fmt.Errorf("write response: %w", err)
 	}
-	return 0
+	return nil
 }
 
 // generate does the work and turns any failure into response.error.

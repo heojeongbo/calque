@@ -16,6 +16,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/heojeongbo/calque/backend/dexie"
@@ -27,7 +28,12 @@ import (
 	"github.com/heojeongbo/calque/target/ts"
 )
 
-func main() { os.Exit(plugin.Serve(os.Stdin, os.Stdout, os.Stderr, registry())) }
+func main() {
+	if err := plugin.Serve(os.Stdin, os.Stdout, os.Stderr, registry()); err != nil {
+		fmt.Fprintln(os.Stderr, "calque:", err)
+		os.Exit(1)
+	}
+}
 
 // registry is the composition point. Adding a target or a backend is a line
 // here and nothing else.
