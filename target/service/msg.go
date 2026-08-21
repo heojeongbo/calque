@@ -317,6 +317,11 @@ func pascal(s string) string {
 	return string(out)
 }
 
+// upperRune is ASCII, and target/ts has the same six lines.
+//
+// They stay apart for the reason pascal above and toCamel there both give: each
+// reproduces one generator's spelling, and the moment they share a helper the
+// next reader has a casing package to correct.
 func upperRune(r rune) rune {
 	if r >= 'a' && r <= 'z' {
 		return r - ('a' - 'A')

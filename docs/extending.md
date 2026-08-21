@@ -285,9 +285,10 @@ backend" a claim rather than a fact.
 
 ## Emitting
 
-There is no formatter and no template engine. `internal/tsw` is about forty
-lines: a `P()` that writes a line and tracks indentation. Both targets build
-strings.
+There is no formatter and no template engine. `internal/linew` is about forty
+lines: a `P()` that writes a line, and a depth. `internal/tsw` and
+`internal/prow` wrap it with the parts that are about a language rather than
+about a line. Every target builds strings.
 
 That is deliberate. calque's first job is to reproduce an existing generator's
 output byte for byte, and a formatter would normalise away the trailing space in

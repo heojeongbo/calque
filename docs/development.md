@@ -126,8 +126,9 @@ were. Run both.
 | `backend/dexie/`, `backend/entsql/` | storage decisions |
 | `target/ts/`, `target/gotarget/`, `target/service/` | emission |
 | `internal/policy/` | checks about the shape of the repository, not its behaviour |
-| `internal/tsw/` | a forty-line line writer |
-| `internal/prow/` | the same, for `.proto`, plus a depth |
+| `internal/linew/` | the line writer both emitters use. Changing it changes two generators' output |
+| `internal/tsw/` | TypeScript's half: a name's first letter, and a string literal |
+| `internal/prow/` | `.proto`'s half: a string literal, a field line, a comment |
 | `internal/entname/` | ent's casing, copied and pinned |
 | `internal/protoc/` | in-process proto compilation, for tests |
 | `plugin/` | the protoc-plugin boundary |

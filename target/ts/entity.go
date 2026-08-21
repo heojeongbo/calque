@@ -361,6 +361,14 @@ func toCamel(s string) string {
 	return string(out)
 }
 
+// upperRune and lowerRune are ASCII, and target/service has its own copy of the
+// first one.
+//
+// Six duplicated lines, kept: the two callers are toCamel here and pascal
+// there, and both carry a comment saying they reproduce a specific generator's
+// spelling and must not be replaced by a casing library. A shared helper is the
+// first half of that library, and the reason it would be wrong is written down
+// twice already.
 func upperRune(r rune) rune {
 	if r >= 'a' && r <= 'z' {
 		return r - ('a' - 'A')

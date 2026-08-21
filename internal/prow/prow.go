@@ -1,92 +1,28 @@
-// Package prow writes .proto text, and does as little as possible while doing it.
+// Package prow writes .proto text.
 //
-// It is internal/tsw with one addition: a depth, because proto nests and
-// TypeScript output did not need to. The reason for the rest of the austerity is
-// the same — there is no formatter and no pretty-printer, because the first job
-// of the target using this is to emit output byte-identical to what another
-// generator emits, and every convenience a writer might offer is a way for the
-// bytes to differ.
+// The writing itself is [linew], which says why there is no formatter and what
+// changing it costs. What is here is the three things that are about proto
+// rather than about lines: a string literal, a field line, and a comment.
 //
-// The output it has to reproduce is tab-indented, one tab per level, and carries
-// blank lines in specific places: after the package, after the import block only
-// if there was one, between declarations but not after the last. Those are the
-// caller's business. This decides indentation and nothing else.
+// Unlike TypeScript, proto nests, so this one uses the depth. The output it has
+// to reproduce is tab-indented, one tab per level, and carries blank lines in
+// specific places: after the package, after the import block only if there was
+// one, between declarations but not after the last. Those are the caller's
+// business. The writer decides indentation and nothing else.
 package prow
 
 import (
-	"bytes"
-	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/heojeongbo/calque/internal/linew"
 )
 
 // File accumulates one emitted file.
-type File struct {
-	b     bytes.Buffer
-	depth int
-}
+type File struct{ linew.File }
 
 // New returns an empty file.
 func New() *File { return &File{} }
-
-// P writes one line at the current depth: the arguments concatenated with no
-// separator, then a newline.
-//
-// A line with no arguments is a blank line and gets no indentation, because
-// trailing tabs on an otherwise empty line are a diff nobody meant to write.
-func (f *File) P(args ...any) {
-	if len(args) > 0 {
-		for range f.depth {
-			f.b.WriteByte('\t')
-		}
-	}
-	for _, a := range args {
-		switch v := a.(type) {
-		case string:
-			f.b.WriteString(v)
-		case fmt.Stringer:
-			f.b.WriteString(v.String())
-		default:
-			fmt.Fprint(&f.b, v)
-		}
-	}
-	f.b.WriteByte('\n')
-}
-
-// In and Out move one level. Out at depth zero stays at zero rather than
-// panicking: an unbalanced emitter should produce visibly wrong output, not a
-// crash in a plugin whose stdout is the protocol.
-func (f *File) In() { f.depth++ }
-
-func (f *File) Out() {
-	if f.depth > 0 {
-		f.depth--
-	}
-}
-
-// Depth is the current level, for a caller that wants to assert its own balance.
-func (f *File) Depth() int { return f.depth }
-
-// Block writes `<head> {`, runs body one level in, then `}`.
-//
-// Every nesting in a proto file is this shape, and doing it by hand is how an
-// emitter comes to leak a level after an early return.
-func (f *File) Block(head string, body func()) {
-	f.P(head, " {")
-	f.In()
-	body()
-	f.Out()
-	f.P("}")
-}
-
-// Len is how many bytes have been written.
-func (f *File) Len() int { return f.b.Len() }
-
-// Bytes is the file.
-func (f *File) Bytes() []byte { return f.b.Bytes() }
-
-// String is the file, as a string.
-func (f *File) String() string { return f.b.String() }
 
 // Quote renders a proto string literal the way protoc-gen-go's printer does,
 // which is Go's %q.

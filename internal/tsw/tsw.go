@@ -1,64 +1,27 @@
-// Package tsw writes TypeScript, and does as little as possible while doing it.
+// Package tsw writes TypeScript.
 //
-// There is no import management, no sorting, no formatter, and no
-// prettification. That is not an oversight — it is the requirement. calque's
-// first job is to emit output byte-identical to what protoc-gen-orm-ts emits,
-// so that swapping generators in an existing repository produces a diff a
-// person can actually read, and every convenience a writer might offer is a way
-// for the bytes to differ.
+// The writing itself is [linew], which says why there is no formatter and what
+// changing it costs. What is here is the two things that are about TypeScript
+// rather than about lines: how a name is lower-cased, and how a string literal
+// is spelled.
 //
-// The committed output this has to reproduce contains, among other things:
-//
-//   - a trailing space on `export type Db = ` in db.g.ts
-//   - client.g.ts ending "}\n\n" while the other files end "}\n"
-//   - the first four imports of a .db.g.ts ending in ";" and the last three not
-//   - tabs, not spaces
-//
-// A formatter eats all four. So there is no formatter, and the emitter is
-// responsible for its own bytes.
+// The emitter never moves the depth. TypeScript output is reproduced from a
+// generator that emitted tabs the caller decided on, so indentation is part of
+// the line rather than a property of the writer.
 package tsw
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
+
+	"github.com/heojeongbo/calque/internal/linew"
 )
 
 // File accumulates one emitted file.
-type File struct {
-	b bytes.Buffer
-}
+type File struct{ linew.File }
 
 // New returns an empty file.
 func New() *File { return &File{} }
-
-// P writes one line: the arguments concatenated with no separator, then a
-// newline.
-//
-// The shape is protogen's, so porting a line from the generator being replaced
-// is mechanical rather than an act of interpretation.
-func (f *File) P(args ...any) {
-	for _, a := range args {
-		switch v := a.(type) {
-		case string:
-			f.b.WriteString(v)
-		case fmt.Stringer:
-			f.b.WriteString(v.String())
-		default:
-			fmt.Fprint(&f.b, v)
-		}
-	}
-	f.b.WriteByte('\n')
-}
-
-// Len is how many bytes have been written.
-func (f *File) Len() int { return f.b.Len() }
-
-// Bytes is the file.
-func (f *File) Bytes() []byte { return f.b.Bytes() }
-
-// String is the file, as a string.
-func (f *File) String() string { return f.b.String() }
 
 // LowerFirst lower-cases the first character and leaves the rest alone.
 //
