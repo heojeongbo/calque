@@ -218,3 +218,80 @@ func TestGeneratedCodeIsMarked(t *testing.T) {
 	})
 	require.NoError(t, err)
 }
+
+// cliOnly are the modules that may be imported by the command tree and by
+// nothing else.
+//
+// calque is a build-time plugin: what it imports lands in the go.mod of every
+// repository that generates with it. A CLI framework is worth that for main
+// and for cmd -- xlitest is what finally gave the plugin boundary a test -- and
+// is not worth it for gen, schema, config, ormcompat or a target, which are the
+// surface docs/extending.md documents and which a fork should be able to use
+// without taking a command tree along.
+//
+// Both are pre-1.0 pseudo-versions with no frozen API. Keeping them in one
+// package is what makes backing them out a change to one package.
+var cliOnly = []string{
+	"github.com/lesomnus/xli",
+	"github.com/lesomnus/z",
+}
+
+// cliDirs are where cliOnly may be imported: the command tree, and main.
+var cliDirs = map[string]bool{".": true, "cmd": true, "cmd/version": true}
+
+// TestCliStaysInCmd is the rule above, checked.
+//
+// It reads imports rather than `go list -deps`, so it holds for test files too:
+// a test that reaches for xlitest outside cmd is the first step towards the
+// production code doing the same.
+func TestCliStaysInCmd(t *testing.T) {
+	root, err := filepath.Abs("../..")
+	require.NoError(t, err)
+
+	fset := token.NewFileSet()
+	var offences []string
+
+	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if name := d.Name(); name == ".git" || name == "node_modules" || name == "testdata" {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		if cliDirs[filepath.Dir(rel)] {
+			return nil
+		}
+
+		f, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
+		if err != nil {
+			return err
+		}
+		for _, spec := range f.Imports {
+			p := strings.Trim(spec.Path.Value, `"`)
+			for _, m := range cliOnly {
+				if p == m || strings.HasPrefix(p, m+"/") {
+					offences = append(offences, at(rel, fset, spec)+": "+p)
+				}
+			}
+		}
+		return nil
+	})
+	require.NoError(t, err)
+
+	require.Empty(t, offences,
+		"the CLI reached outside cmd.\n"+
+			"calque is a build-time plugin, so what it imports goes into everybody's\n"+
+			"go.mod. gen, schema, config, ormcompat and the targets are the documented\n"+
+			"extension surface and stay on the standard library and protobuf.")
+}
