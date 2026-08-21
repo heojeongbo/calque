@@ -9,8 +9,9 @@ the generator calque replaces, it is named.
 ```
 CodeGeneratorRequest
   │
+  ├─ cmd/          no subcommand, so: serve
   ├─ plugin/       parse opt=
-  ├─ config/       read calque.yaml, record the overrides
+  ├─ config/       read calque.yaml, record the overrides and the environment
   │
   ├─ ormcompat/    read (orm.*) annotations → schema specs   ─┐ everything about
   │                                                            │ annotations,

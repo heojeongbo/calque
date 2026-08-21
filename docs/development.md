@@ -7,6 +7,22 @@ test -z "$(gofmt -l .)" && go vet ./...
 cd ts && pnpm -r typecheck && pnpm -r test && pnpm -r build
 ```
 
+Two more before committing something that touches emission. The first catches
+the case `go test` alone cannot — output that moved *and* a golden somebody
+regenerated:
+
+```sh
+UPDATE_GOLDEN=1 go test ./target/... && git diff --exit-code
+```
+
+The second proves nothing under test reads the machine it runs on. calque takes
+settings from `CALQUE_*`, and a test that inherited them would pass or fail
+depending on whose shell it was:
+
+```sh
+env CALQUE_TS_HEADER=x CALQUE_DEXIE_COMPAT=none go test ./...
+```
+
 That is the whole suite. There is no protoc in the test path and no buf:
 `internal/protoc` compiles `.proto` source in process with
 [`bufbuild/protocompile`](https://github.com/bufbuild/protocompile), so a
@@ -66,6 +82,22 @@ this test is what stops someone reaching for the panic anyway.
 It has already caught a real one, in `gen/registry.go`, and the fix was to the
 code rather than to the exemption list.
 
+It also catches the *other* spelling — a call to something named `Must` or
+`PanicIf`. That half exists because the first one could not see it: `panic(...)`
+is an `*ast.Ident` and `z.Use[T].Must(ctx)` is an `*ast.SelectorExpr`, so a
+commitment the test appeared to enforce could have been given up without the
+test noticing. The exemption is not the spelling but when the call runs: a
+package-level `var` initialiser runs at process start, before there is a
+request to fail, so `var nameRE = regexp.MustCompile(...)` is legal and the
+same call inside a function is not.
+
+**`TestCliStaysInCmd`** fails if `lesomnus/xli` or `lesomnus/z` is imported
+outside `cmd/`, `cmd/version/` or `main.go`. calque is a build-time plugin, so
+what it imports lands in the go.mod of every repository that generates with it;
+a CLI framework is worth that for the command tree and not for the extension
+surface. Both are pre-1.0, so the question is not whether they move but what it
+costs, and confined to one package the answer is one package.
+
 **`TestGeneratedCodeIsMarked`** checks that every committed `.pb.go` says it is
 generated, since the point of committing generated code is that a reader can
 tell.
@@ -96,6 +128,10 @@ go test ./target/ts/ -run Reference -v
 | `CALQUE_REFERENCE_GO` | the committed Go to compare against |
 | `CALQUE_REFERENCE_INCLUDE` | extra import paths, colon-separated |
 | `CALQUE_REFERENCE_PARAM` | the plugin parameter string, for the Go target's protogen flags |
+
+`CALQUE_REFERENCE_` is reserved: the config reader treats a `CALQUE_*` name
+nothing answers to as a typo and says so, and these five are calque's own, not a
+misspelt setting. See [Configuration](configuration.md#the-environment).
 
 Nothing is copied in. `ormcompat/reference_test.go` checks that the annotations
 parse; `target/ts/reference_test.go` and `target/gotarget/reference_test.go`
@@ -132,7 +168,8 @@ were. Run both.
 | `internal/prow/` | `.proto`'s half: a string literal, a field line, a comment |
 | `internal/entname/` | ent's casing, copied and pinned |
 | `internal/protoc/` | in-process proto compilation, for tests |
-| `plugin/` | the protoc-plugin boundary |
+| `plugin/` | the protoc-plugin boundary: a request in, a response out |
+| `cmd/` | the command tree, and the only place xli and z may be imported |
 | `tools/` | developer commands; `gen-ormopt` regenerates the vocabulary's Go |
 | `ts/` | the two npm runtime packages |
 

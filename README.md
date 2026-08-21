@@ -78,9 +78,34 @@ and the diff is empty.
 The two npm runtime packages are published from [`ts/`](ts). There is no Go
 equivalent and none is needed — ent already is that layer, so the generated Go
 depends on calque for nothing at run time
-([why](docs/targets/go.md#runtime)). Everything else has no dependencies beyond
-the Go module: `go test ./...` compiles protos in process, so there is no protoc
-and no buf in the test path.
+([why](docs/targets/go.md#runtime)).
+
+`go test ./...` is the whole suite: protos are compiled in process, so there is
+no protoc and no buf in the test path.
+
+The generator itself runs on the standard library and `google.golang.org/protobuf`,
+with `goccy/go-yaml` in one package for the config file. The command tree adds
+`lesomnus/xli` and `lesomnus/z`, and they are confined to
+[`cmd/`](cmd) — calque is a build-time plugin, so what it imports lands in the
+go.mod of every repository that generates with it, and the extension surface
+should not make anyone take a CLI framework along. A test enforces that rather
+than a convention.
+
+## Beyond the plugin
+
+buf runs calque with no arguments. A person can ask it three other things:
+
+```sh
+calque config       # read calque.yaml and say what this build makes of it
+calque targets      # the targets and backends this binary knows
+calque version      # which calque this is
+```
+
+`calque config` is the interesting one: it resolves and configures everything
+the file names without generating, so every error a build can hit before it
+touches a proto is reachable without buf and without a proto tree — and it
+prints the *effective* settings, defaults and `CALQUE_*` variables included.
+See [the CLI](docs/cli.md).
 
 ## Documentation
 
@@ -88,7 +113,8 @@ and no buf in the test path.
 |---|---|
 | [Annotations](docs/annotations.md) | what you write in a `.proto`, what is inferred when you write nothing, and every validation error |
 | [Proto conventions](docs/conventions.md) | how to lay a proto tree out — the names calque looks up, and which ones fail quietly |
-| [Configuration](docs/configuration.md) | `calque.yaml` and the plugin's `opt=` parameters, in full |
+| [Configuration](docs/configuration.md) | `calque.yaml`, the plugin's `opt=` parameters and the `CALQUE_*` environment, in full |
+| [The command line](docs/cli.md) | what a person can ask calque, and why buf asks it nothing |
 | [Architecture](docs/architecture.md) | how a request becomes files, and why the seams are where they are |
 | [Extending](docs/extending.md) | adding a target language or a storage backend |
 | [Service target](docs/targets/service.md) | the `.proto` contract the other two read |

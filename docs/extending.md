@@ -4,10 +4,10 @@ Two things can be added: a **target**, which is a language, and a **backend**,
 which is a store. They are separate because the same language can speak to more
 than one store, and the same store can be spoken to from more than one language.
 
-Both are registered at composition time, in `main.go`:
+Both are registered at composition time, in `cmd.Registry`:
 
 ```go
-func registry() *gen.Registry {
+func Registry() *gen.Registry {
 	return gen.NewRegistry().
 		Target(ts.New()).
 		Target(gotarget.New()).
@@ -19,8 +19,31 @@ func registry() *gen.Registry {
 
 There is no config-driven loading of third-party plugins. Go's runtime plugin
 support is Linux-only and requires an identical toolchain and identical build
-flags, which is a worse contract than a twenty-five line `main` that imports what
-it wants and calls `Serve`. Fork, add a line, build.
+flags, which is a worse contract than a `main` that imports what it wants.
+
+So there are two ways in. **Fork**, add a line to `cmd.Registry`, build. Or
+**keep your own main** and add the line there — `NewCmdRoot` takes a registry,
+so nothing needs forking:
+
+```go
+package main
+
+func main() {
+	r := cmd.Registry().Target(mylang.New()).Backend(mystore.New())
+	c := cmd.NewCmdRoot(r, os.Environ())
+	if err := c.Run(context.Background(), os.Args[1:]); err != nil {
+		fmt.Fprintln(os.Stderr, "calque:", err)
+		os.Exit(1)
+	}
+}
+```
+
+Twelve lines, and you inherit the plugin path, `calque config`, `calque
+targets` and `calque version` with it. Point buf at your module instead of
+calque's and the entry is otherwise identical.
+
+Below that there is [`plugin.Serve`](../plugin), which is the request-in
+response-out door and takes no command tree. Use it if you want neither.
 
 ## Adding a backend
 
