@@ -122,7 +122,8 @@ were. Run both.
 | `ormopt/` | its generated Go, committed |
 | `ormcompat/` | annotations to schema specs |
 | `schema/` | the neutral IR: entities, props, indexes, names, diagnostics |
-| `gen/` | the generator core: config, `Target`, `Backend`, capabilities, output |
+| `config/` | `calque.yaml`: the document, its sections, and the `opt=` overrides. The only package that reads YAML |
+| `gen/` | the generator core: `Target`, `Backend`, capabilities, output |
 | `backend/dexie/`, `backend/entsql/` | storage decisions |
 | `target/ts/`, `target/gotarget/`, `target/service/` | emission |
 | `internal/policy/` | checks about the shape of the repository, not its behaviour |

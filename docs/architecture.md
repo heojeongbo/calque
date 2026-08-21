@@ -9,7 +9,8 @@ the generator calque replaces, it is named.
 ```
 CodeGeneratorRequest
   │
-  ├─ plugin/       parse opt=, read calque.yaml, apply overrides
+  ├─ plugin/       parse opt=
+  ├─ config/       read calque.yaml, record the overrides
   │
   ├─ ormcompat/    read (orm.*) annotations → schema specs   ─┐ everything about
   │                                                            │ annotations,
@@ -21,7 +22,7 @@ CodeGeneratorRequest
   │    ├─ reject sections nobody claimed
   │    ├─ per target:
   │    │    ├─ CheckCapabilities  → refuse, or warn
-  │    │    ├─ Backend.Lower      → tables, paths, codecs
+  │    │    ├─ Backend.Lower      → codecs
   │    │    └─ Target.Emit        → files
   │    └─ collect diagnostics
   │

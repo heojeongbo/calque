@@ -31,7 +31,7 @@ while the runtime is on its second is the evidence, not an oversight.
   [conformance item 5](conformance.md).
 - **The config version refuses at parse time**, loudly and by name, rather than
   letting a newer document decompose into a pile of unknown-key errors
-  (`gen/config.go:21-26`).
+  (`config/config.go`, `FormatVersion`).
 
 So the question to ask before upgrading anything is which of the three you are
 touching. Upgrading the plugin is safe until you regenerate; upgrading the
