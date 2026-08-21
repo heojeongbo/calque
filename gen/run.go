@@ -101,7 +101,7 @@ func Run(s *schema.Schema, cfg *Config, r *Registry, options ...RunOption) (*Out
 	opts.progress.Start(len(s.Sources()), len(plan))
 
 	for _, p := range plan {
-		opts.progress.TargetStart(p.entry.Label(), backendName(p.backend))
+		opts.progress.TargetStart()
 
 		// A storeless target skips all of this. Capabilities are facts about a
 		// store, lowering is a store's decisions, and neither is a question about

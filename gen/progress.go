@@ -3,7 +3,6 @@ package gen
 import (
 	"fmt"
 	"io"
-	"sync"
 	"time"
 )
 
@@ -16,11 +15,16 @@ import (
 // It writes whole lines and never a carriage return. Under buf, stderr is a
 // pipe rather than a terminal, so a spinner that overwrites one line leaves the
 // log full of \r and unreadable. The percentage goes inside the line instead.
+//
+// It is not safe for concurrent use, and says so rather than pretending with a
+// lock. A run is one target at a time (Run's loop), and a target's Step calls
+// come from inside its own Emit. A mutex here would imply a concurrency that
+// does not exist -- and if one ever does, Output.Add needs the same answer at
+// the same time, decided together and checked with -race.
 type Progress struct {
 	w     io.Writer
 	start time.Time
 
-	mu       sync.Mutex
 	targets  int
 	done     int
 	files    int
@@ -38,27 +42,26 @@ func NewProgress(w io.Writer) *Progress {
 
 // Start announces the run.
 func (p *Progress) Start(entities, targets int) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	p.targets = targets
 	p.start = time.Now()
 	fmt.Fprintf(p.w, "calque: %s, %s\n", plural(entities, "entity", "entities"), plural(targets, "target", "targets"))
 }
 
-// TargetStart notes which target is running, so a slow one is identifiable even
-// if the run never finishes.
-func (p *Progress) TargetStart(label, backend string) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+// TargetStart stamps when this target began, for the duration TargetDone
+// reports.
+//
+// It prints nothing. It used to take the label and the backend and claim to
+// note which target was running "so a slow one is identifiable even if the run
+// never finishes" -- which it never did, because nothing reaches the log until
+// TargetDone. Saying what it does is worth more than a parameter list
+// describing a feature that is not here; the feature itself is a separate
+// question, and a separate line of output.
+func (p *Progress) TargetStart() {
 	p.targetAt = time.Now()
 }
 
 // TargetDone reports one target's result and the share of the run completed.
 func (p *Progress) TargetDone(label, backend string, files int) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	p.done++
 	p.files += files
 
@@ -81,9 +84,6 @@ func (p *Progress) TargetDone(label, backend string, files int) {
 // target-level line is not enough. A target that never calls it still gets its
 // own line.
 func (p *Progress) Step(label string, done, total int, what string) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	pct := 100
 	if total > 0 {
 		pct = done * 100 / total
@@ -93,8 +93,6 @@ func (p *Progress) Step(label string, done, total int, what string) {
 
 // Finish reports the whole run.
 func (p *Progress) Finish() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
 	fmt.Fprintf(p.w, "calque: %s, %s\n", plural(p.files, "file", "files"), took(time.Since(p.start)))
 }
 

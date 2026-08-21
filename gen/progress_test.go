@@ -21,10 +21,10 @@ func TestProgressNeverWritesCarriageReturn(t *testing.T) {
 	p := gen.NewProgress(&out)
 
 	p.Start(13, 2)
-	p.TargetStart("ts", "dexie")
+	p.TargetStart()
 	p.Step("ts", 7, 13, "Robot")
 	p.TargetDone("ts", "dexie", 19)
-	p.TargetStart("go", "entsql")
+	p.TargetStart()
 	p.TargetDone("go", "entsql", 42)
 	p.Finish()
 
@@ -42,9 +42,9 @@ func TestProgressReportsSharesAndTotals(t *testing.T) {
 	p := gen.NewProgress(&out)
 
 	p.Start(13, 2)
-	p.TargetStart("ts", "dexie")
+	p.TargetStart()
 	p.TargetDone("ts", "dexie", 19)
-	p.TargetStart("go", "entsql")
+	p.TargetStart()
 	p.TargetDone("go", "entsql", 42)
 	p.Finish()
 
@@ -59,7 +59,7 @@ func TestProgressPluralises(t *testing.T) {
 	var out bytes.Buffer
 	p := gen.NewProgress(&out)
 	p.Start(1, 1)
-	p.TargetStart("ts", "dexie")
+	p.TargetStart()
 	p.TargetDone("ts", "dexie", 1)
 	p.Finish()
 
@@ -75,7 +75,7 @@ func TestProgressToNilWriterIsSilent(t *testing.T) {
 	p := gen.NewProgress(nil)
 	require.NotPanics(t, func() {
 		p.Start(1, 1)
-		p.TargetStart("ts", "dexie")
+		p.TargetStart()
 		p.Step("ts", 1, 1, "User")
 		p.TargetDone("ts", "dexie", 1)
 		p.Finish()
