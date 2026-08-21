@@ -11,6 +11,7 @@ func registry() *gen.Registry {
 	return gen.NewRegistry().
 		Target(ts.New()).
 		Target(gotarget.New()).
+		Target(service.New()).
 		Backend(dexie.New()).
 		Backend(entsql.New())
 }

@@ -29,5 +29,15 @@ if [ -z "${NPM_TOKEN:-}" ]; then
 	exit 1
 fi
 
+# .npmrc is gitignored, so a fresh clone with a filled-in .env still has none --
+# and npm treats a userconfig that does not exist as an empty one rather than as
+# an error, which means the publish would fall through to whatever registry the
+# developer is logged into. That is the failure this script exists to prevent,
+# so it is checked rather than assumed.
+if [ ! -f "$root/.npmrc" ]; then
+	echo "ts/.npmrc is missing. It points npm at registry.npmjs.org; copy .npmrc.example." >&2
+	exit 1
+fi
+
 export npm_config_userconfig="$root/.npmrc"
 exec "$@"

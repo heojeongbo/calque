@@ -163,4 +163,14 @@ pnpm release:runtime:dry     # then without :dry
 pnpm release:dexie:dry
 ```
 
+Runtime before dexie, and with **pnpm** rather than npm. `calque-dexie` depends
+on `calque-runtime` as `workspace:0.1.0`, and `pnpm publish` is what rewrites
+that into a real version range on the way out — `npm publish` would upload the
+`workspace:` protocol verbatim and produce a package nobody can install. The
+failure is silent until someone tries.
+
+`with-env.sh` refuses to run without `ts/.env` and `ts/.npmrc`, both gitignored:
+the first holds `NPM_TOKEN` and the second is what points npm at
+registry.npmjs.org. Copy them from the `.example` files.
+
 The plugin itself is a Go module; a release is a tag.

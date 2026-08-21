@@ -73,6 +73,7 @@ and the diff is empty.
 |---|---|
 | **TypeScript**, on Dexie | **complete** — 28 of 28 files byte-identical |
 | **Go**, on ent and SQL | **complete** — 42 of 42 files byte-identical, and the replaced tree's own test suites pass against the generated code |
+| **the service contract**, as `.proto` | **complete** — the input the other two read, and it takes no backend ([why](docs/targets/service.md)) |
 
 The two npm runtime packages are published from [`ts/`](ts). There is no Go
 equivalent and none is needed — ent already is that layer, so the generated Go
