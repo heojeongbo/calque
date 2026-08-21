@@ -75,11 +75,15 @@ type File struct {
 // adding it here, where every target gets it, rather than reaching into
 // descriptors — which is how the predecessor ended up with two different ideas
 // of what a field is called.
+// There is deliberately no *Config here. A target claims its section in
+// Configure, which Run calls before CheckUnclaimed; handing it the whole
+// document at Emit time would let it claim a second section after the check
+// that reports unclaimed ones has already passed, which is the check
+// docs/configuration.md promises will catch a misspelled section name.
 type Generator struct {
 	schema  *schema.Schema
 	lowered *Lowered
 	backend Backend
-	config  *Config
 	entry   TargetConfig
 	diags   *schema.Diagnostics
 
@@ -126,10 +130,14 @@ func (g *Generator) Warnf(format string, a ...any) {
 	fmt.Fprintf(g.warn, "calque: "+format+"\n", a...)
 }
 
-// NewGenerator builds the view a target is given. It is exported for targets'
-// own tests; the plugin builds one per configured target.
-func NewGenerator(s *schema.Schema, l *Lowered, b Backend, cfg *Config, entry TargetConfig, diags *schema.Diagnostics) *Generator {
-	return &Generator{schema: s, lowered: l, backend: b, config: cfg, entry: entry, diags: diags}
+// newGenerator builds the view a target is given, one per configured target.
+//
+// It is unexported, and the export it replaces claimed to be "for targets' own
+// tests". No test ever called it: every target's golden test builds a
+// one-entry Registry and calls Run, which is the only way to exercise the
+// ordering Run guarantees. See docs/extending.md#testing-it.
+func newGenerator(s *schema.Schema, l *Lowered, b Backend, entry TargetConfig, diags *schema.Diagnostics) *Generator {
+	return &Generator{schema: s, lowered: l, backend: b, entry: entry, diags: diags}
 }
 
 // Schema is every entity, including ones reachable only as an edge target.
@@ -163,9 +171,6 @@ func (g *Generator) Table(e *schema.Entity) (*Table, error) {
 // target. A target that asserts on a concrete backend already handles nil: the
 // type assertion fails and it reports what it wanted.
 func (g *Generator) Backend() Backend { return g.backend }
-
-// Config is the whole config, for a target that needs to claim its section.
-func (g *Generator) Config() *Config { return g.config }
 
 // Entry is this target's own config entry.
 func (g *Generator) Entry() TargetConfig { return g.entry }

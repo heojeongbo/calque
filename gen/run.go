@@ -132,7 +132,7 @@ func Run(s *schema.Schema, cfg *Config, r *Registry, options ...RunOption) (*Out
 			}
 		}
 
-		g := NewGenerator(s, lowered, p.backend, cfg, p.entry, &diags)
+		g := newGenerator(s, lowered, p.backend, p.entry, &diags)
 		g.req, g.files, g.warn = opts.req, opts.files, opts.warn
 		g.progress, g.label = opts.progress, p.entry.Label()
 		files, err := p.target.Emit(g)

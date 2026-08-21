@@ -225,7 +225,7 @@ claiming the same path is an error naming both, not last-one-wins.
 | `Table(e)` | the backend's decisions for one entity — its codecs, and its `Extra` |
 | `Lowered()` | all of them |
 | `Backend()` | the paired backend, for a target-specific question |
-| `Config()`, `Entry()` | the config, and this entry |
+| `Entry()` | this target's own config entry — its label, and its `out` |
 | `Request()`, `Files()` | descriptors, for facts the schema does not carry |
 | `Warnf(...)` | something worth saying that is not worth stopping for |
 | `Diag()` | a schema problem only this target can see |
@@ -302,6 +302,19 @@ runs gofmt — appropriate there, because gofmt output *is* the specific bytes.
 Point the golden tests at your target. `target/ts/golden_test.go` compiles
 `testdata/proto/valid/*.proto` in process and compares against committed output;
 `UPDATE_GOLDEN=1 go test ./...` rewrites it.
+
+There is no constructor for a `Generator`, on purpose: a target's test builds a
+registry with one entry and calls `gen.Run`, the same way a build does.
+
+```go
+s, files, err := protoc.ParseFiles(req)
+out, err := gen.Run(s, cfg, gen.NewRegistry().Target(mylang.New()).Backend(mystore.New()),
+	gen.WithDescriptors(req, files))
+```
+
+Handing a target a `Generator` you assembled yourself would skip resolution,
+configuration and the unclaimed-section check — which is to say it would test
+the target against a state `Run` never produces.
 
 If you are replacing an existing generator, add a reference test like
 `target/ts/reference_test.go`: it takes a proto root and an expected output tree
