@@ -11,7 +11,15 @@ import (
 
 func config(t *testing.T, args ...string) xlitest.Result {
 	t.Helper()
-	return xlitest.Run(t, cmd.NewCmdRoot(cmd.Registry()), append([]string{"config"}, args...)...)
+	return configIn(t, nil, args...)
+}
+
+// configIn runs `calque config` in an environment the test states. It is a
+// parameter all the way down from NewCmdRoot, so these assertions hold whatever
+// the machine running them happens to export.
+func configIn(t *testing.T, environ []string, args ...string) xlitest.Result {
+	t.Helper()
+	return xlitest.Run(t, cmd.NewCmdRoot(cmd.Registry(), environ), append([]string{"config"}, args...)...)
 }
 
 // TestConfigShowsTheEffectiveValues is the point of the command.
@@ -38,7 +46,7 @@ func TestConfigAppliesOverrides(t *testing.T) {
 	require.NoError(t, got.Err)
 	require.Contains(t, got.Stdout, "compat: none")
 	require.Contains(t, got.Stdout, "import_extension: .js")
-	require.Contains(t, got.Stdout, "--opt only")
+	require.Contains(t, got.Stdout, "(--opt)")
 }
 
 // TestConfigFailsTheWayABuildWould: this is gen.Resolve, so every error a build
@@ -64,4 +72,32 @@ func TestConfigSaysWhereItLooked(t *testing.T) {
 
 	require.ErrorContains(t, got.Err, "no config at /")
 	require.ErrorContains(t, got.Err, "testdata/nope.yaml")
+}
+
+// TestTheSectionsOfThisBuildAreRead is the one thing these tests say about
+// calque rather than about the reading: the walker is wired to the options the
+// real targets and backends declare, and to nothing they keep to themselves.
+//
+// config/env_test.go covers every shape a section can have, against a struct of
+// its own that does not change when a target does. This is the wire.
+func TestTheSectionsOfThisBuildAreRead(t *testing.T) {
+	got := configIn(t, []string{
+		"CALQUE_TS_IMPORT_EXTENSION=.js",
+		"CALQUE_DEXIE_COMPAT=none",
+	}, "-c", "testdata/calque.yaml")
+	require.NoError(t, got.Err)
+
+	require.Contains(t, got.Stdout, "import_extension: .js")
+	require.Contains(t, got.Stdout, "compat: none")
+	require.Contains(t, got.Stdout, "CALQUE_TS_IMPORT_EXTENSION",
+		"the command says which variable reached which section")
+}
+
+// TestANameNothingAnswersToIsShown: an environment variable is ambient and may
+// belong to something else on the machine, so it is reported and not refused.
+func TestANameNothingAnswersToIsShown(t *testing.T) {
+	got := configIn(t, []string{"CALQUE_DEXEI_COMPAT=none"}, "-c", "testdata/calque.yaml")
+	require.NoError(t, got.Err, "a stray variable does not stop a build")
+	require.Contains(t, got.Stdout, "CALQUE_DEXEI_COMPAT")
+	require.Contains(t, got.Stdout, "nothing answers to this")
 }

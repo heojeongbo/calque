@@ -29,7 +29,7 @@ import (
 // That is only possible because Config.Section remembers the value its
 // claimant decoded into -- this package cannot name *ts.Options and does not
 // have to.
-func NewCmdConfig(r *gen.Registry) *xli.Command {
+func NewCmdConfig(r *gen.Registry, environ []string) *xli.Command {
 	return &xli.Command{
 		Name:  "config",
 		Brief: "read calque.yaml and say what this build makes of it",
@@ -42,7 +42,7 @@ func NewCmdConfig(r *gen.Registry) *xli.Command {
 		},
 
 		Handler: xli.OnRun(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
-			cfg, err := loadConfig(cmd)
+			cfg, err := loadConfig(cmd, environ)
 			if err != nil {
 				return err
 			}
@@ -70,6 +70,17 @@ func NewCmdConfig(r *gen.Registry) *xli.Command {
 					cmd.Printf("    %s\n", line)
 				}
 			}
+
+			// What the environment can say, and what it did say. It is the
+			// only layer with no record in the tree, so the command that
+			// exists to answer "what will this build do" has to show it.
+			if names := cfg.UnreadEnv(); len(names) > 0 {
+				cmd.Println()
+				cmd.Println("ignored")
+				for _, name := range names {
+					cmd.Printf("  %s  nothing answers to this\n", name)
+				}
+			}
 			return next(ctx)
 		}),
 	}
@@ -80,7 +91,7 @@ func NewCmdConfig(r *gen.Registry) *xli.Command {
 // The path resolution is plugin.Params's, not a second implementation of it:
 // what `calque config` reads has to be what a build reads, or the command is
 // answering a question nobody asked.
-func loadConfig(cmd *xli.Command) (*gen.Config, error) {
+func loadConfig(cmd *xli.Command, environ []string) (*gen.Config, error) {
 	p := &plugin.Params{Overrides: map[string]string{}}
 	if v, ok := flg.Get[string](cmd, "config"); ok {
 		p.Config = v
@@ -98,6 +109,7 @@ func loadConfig(cmd *xli.Command) (*gen.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	cfg.ReadEnv(environ)
 
 	opts, _ := flg.Get[[]string](cmd, "opt")
 	for _, o := range opts {
@@ -120,19 +132,23 @@ func pairing(p gen.Entry) string {
 	return p.Target.Name() + " → " + p.Backend.Name()
 }
 
-// source says where a section's values came from, which is the question a
-// person running this actually has.
+// source says where a section's values came from, in the order they were
+// applied, which is the question a person running this actually has.
 func source(c config.Claimant) string {
-	switch {
-	case c.FromFile && c.Overridden:
-		return "file, then --opt"
-	case c.FromFile:
-		return "file"
-	case c.Overridden:
-		return "--opt only"
-	default:
+	var from []string
+	if c.FromFile {
+		from = append(from, "file")
+	}
+	if len(c.FromEnv) > 0 {
+		from = append(from, strings.Join(c.FromEnv, " "))
+	}
+	if c.Overridden {
+		from = append(from, "--opt")
+	}
+	if len(from) == 0 {
 		return "defaults only"
 	}
+	return strings.Join(from, ", then ")
 }
 
 func splitLines(s string) []string {

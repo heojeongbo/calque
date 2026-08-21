@@ -36,15 +36,21 @@ func request(t *testing.T, param string, files ...string) []byte {
 	return b
 }
 
-// run drives the whole plugin: request in, response out.
+// run drives the whole plugin: request in, response out, in an environment the
+// test states rather than the one it inherits.
 func run(t *testing.T, param string, files ...string) (*pluginpb.CodeGeneratorResponse, xlitest.Result) {
+	t.Helper()
+	return runIn(t, nil, param, files...)
+}
+
+func runIn(t *testing.T, environ []string, param string, files ...string) (*pluginpb.CodeGeneratorResponse, xlitest.Result) {
 	t.Helper()
 
 	if len(files) == 0 {
 		files = []string{"apptest.proto", "apptest_svc.proto"}
 	}
 	got := xlitest.Harness{
-		Cmd: cmd.NewCmdRoot(cmd.Registry()),
+		Cmd: cmd.NewCmdRoot(cmd.Registry(), environ),
 		// A []byte and a string hold the same bytes; the request is binary and
 		// survives the round trip either way.
 		Stdin: string(request(t, param, files...)),
@@ -158,9 +164,38 @@ func TestProgressNeverWritesCarriageReturn(t *testing.T) {
 // TestNoSubcommandWithNothingOnStdin: a person who typed `calque` gets a
 // sentence, not a CodeGeneratorResponse rendered on their terminal.
 func TestNoSubcommandWithNothingOnStdin(t *testing.T) {
-	got := xlitest.Run(t, cmd.NewCmdRoot(cmd.Registry()))
+	got := xlitest.Run(t, cmd.NewCmdRoot(cmd.Registry(), nil))
 
 	require.ErrorContains(t, got.Err, "nothing on stdin")
 	require.ErrorContains(t, got.Err, "calque is a protoc plugin")
 	require.Empty(t, got.Stdout, "stdout is the protocol; nothing else may go there")
+}
+
+// TestTheEnvironmentReachesTheBuildAndSaysSo.
+//
+// The variable changes emitted bytes and leaves nothing in the tree, so the
+// line on stderr is the only record that this build was not the one the file
+// describes. It is on the writer `quiet` does not reach, for that reason.
+func TestTheEnvironmentReachesTheBuildAndSaysSo(t *testing.T) {
+	environ := []string{
+		"CALQUE_TS_IMPORT_EXTENSION=.js",
+		"CALQUE_DEXEI_COMPAT=typo",
+		"HOME=/somewhere", // not calque's, and not reported
+	}
+
+	res, got := runIn(t, environ, "config=testdata/calque.yaml,quiet=true")
+	require.NoError(t, got.Err)
+
+	var db string
+	for _, f := range res.GetFile() {
+		if f.GetName() == "apptest/db.g.ts" {
+			db = f.GetContent()
+		}
+	}
+	require.Contains(t, db, `.js"`, "the environment reached the emitted bytes")
+
+	require.Contains(t, got.Stderr, "CALQUE_TS_IMPORT_EXTENSION set ts from the environment")
+	require.Contains(t, got.Stderr, "nothing reads CALQUE_DEXEI_COMPAT")
+	require.NotContains(t, got.Stderr, "[1/1]", "and quiet still silenced progress")
+	require.NotContains(t, got.Stderr, "HOME")
 }

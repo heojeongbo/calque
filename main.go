@@ -21,7 +21,7 @@ import (
 )
 
 func main() {
-	c := cmd.NewCmdRoot(cmd.Registry())
+	c := cmd.NewCmdRoot(cmd.Registry(), os.Environ())
 	if err := c.Run(context.Background(), os.Args[1:]); err != nil {
 		// "calque:" and not "error:", because buf interleaves a plugin's
 		// stderr with its own and an unattributed line is not attributable.

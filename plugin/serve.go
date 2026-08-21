@@ -23,6 +23,9 @@ import (
 // failure buf cannot explain on calque's behalf, and the only one worth a
 // non-zero exit.
 //
+// environ is what os.Environ returns, passed rather than read, so that a test
+// can say what the environment is without setting one.
+//
 // It returns an error rather than an exit code because its caller is a command
 // among other commands now, and one of them printing "calque: ..." while the
 // others return is how two spellings of the same failure appear in one build
@@ -32,7 +35,7 @@ import (
 // directory (buf may be writing into an archive, and the plugin is never told
 // the root), so drift is a thing `go test` checks against committed goldens,
 // not something a plugin can discover about itself.
-func Serve(stdin io.Reader, stdout, stderr io.Writer, r *gen.Registry) error {
+func Serve(stdin io.Reader, stdout, stderr io.Writer, environ []string, r *gen.Registry) error {
 	in, err := io.ReadAll(stdin)
 	if err != nil {
 		return fmt.Errorf("read request: %w", err)
@@ -43,7 +46,7 @@ func Serve(stdin io.Reader, stdout, stderr io.Writer, r *gen.Registry) error {
 		return fmt.Errorf("parse request: %w", err)
 	}
 
-	res := generate(req, r, stderr)
+	res := generate(req, environ, r, stderr)
 	res.SupportedFeatures = proto.Uint64(uint64(
 		pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL |
 			pluginpb.CodeGeneratorResponse_FEATURE_SUPPORTS_EDITIONS))
@@ -61,7 +64,7 @@ func Serve(stdin io.Reader, stdout, stderr io.Writer, r *gen.Registry) error {
 }
 
 // generate does the work and turns any failure into response.error.
-func generate(req *pluginpb.CodeGeneratorRequest, r *gen.Registry, stderr io.Writer) *pluginpb.CodeGeneratorResponse {
+func generate(req *pluginpb.CodeGeneratorRequest, environ []string, r *gen.Registry, stderr io.Writer) *pluginpb.CodeGeneratorResponse {
 	fail := func(format string, a ...any) *pluginpb.CodeGeneratorResponse {
 		return &pluginpb.CodeGeneratorResponse{Error: proto.String("calque: " + fmt.Sprintf(format, a...))}
 	}
@@ -83,6 +86,12 @@ func generate(req *pluginpb.CodeGeneratorRequest, r *gen.Registry, stderr io.Wri
 	if err != nil {
 		return fail("%v", err)
 	}
+
+	// The environment, recorded now and applied per section when each is
+	// claimed. It is a parameter all the way down: nothing under gen or config
+	// reads os.Environ, which is what keeps the golden tests unable to see the
+	// machine they run on.
+	cfg.ReadEnv(environ)
 
 	// Command line over file. A `<section>.<key>=` opt is how a build varies one
 	// setting without a second config, and it is applied here rather than by the

@@ -30,6 +30,7 @@ func Run(s *schema.Schema, cfg *Config, r *Registry, options ...RunOption) (*Out
 	if err != nil {
 		return nil, err
 	}
+	reportEnv(cfg, opts.warn)
 
 	out := NewOutput()
 	var diags schema.Diagnostics
@@ -156,4 +157,26 @@ func WithWarnings(w io.Writer) RunOption {
 // backend could not hold.
 func WithProgress(p *Progress) RunOption {
 	return func(o *runOpts) { o.progress = p }
+}
+
+// reportEnv says what the environment did, on the writer `quiet` cannot reach.
+//
+// Both halves are worth a line for the same reason, which is that an
+// environment variable leaves no trace in the tree. One that was read can move
+// emitted bytes with nothing in the repository recording it, so if it is not in
+// the build log then two machines produce two trees and nothing says why. One
+// that was not read is a typo, and reporting it is the same commitment
+// CheckUnclaimed makes about a section name.
+//
+// The second is a warning and not an error, unlike CheckUnclaimed. A section in
+// the file has an owner; an environment variable is ambient and may belong to
+// something else on the machine entirely, and refusing to generate over one
+// would make calque unusable on a developer's shell.
+func reportEnv(cfg *Config, w io.Writer) {
+	for _, e := range cfg.EnvApplied() {
+		fmt.Fprintf(w, "calque: %s set %s from the environment\n", e.Name, e.Section)
+	}
+	for _, name := range cfg.UnreadEnv() {
+		fmt.Fprintf(w, "calque: nothing reads %s\n", name)
+	}
 }

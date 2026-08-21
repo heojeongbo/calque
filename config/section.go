@@ -28,9 +28,19 @@ func (c *Config) Section(key string, v any) (ok bool, err error) {
 	// without any target having to say anything new.
 	c.claimants[key] = v
 
+	// What this section answers to in the environment. This is where the whole
+	// design turns: a section's Go type belongs to its claimant, so nothing can
+	// enumerate what CALQUE_TS_* may say until the moment ts hands over its own
+	// options struct. Nothing has to enumerate the sections either -- each one
+	// enumerates itself when something is willing to decode it, so a section a
+	// fork added is readable from the environment without being registered
+	// anywhere.
+	c.recordEnvNames(key, v)
+	env := c.envMatches(key)
+
 	node, found := c.extra[key]
 	overrides := c.overrides[key]
-	if !found && len(overrides) == 0 {
+	if !found && len(overrides) == 0 && len(env) == 0 {
 		return false, nil
 	}
 	c.claimed[key] = true
@@ -38,6 +48,20 @@ func (c *Config) Section(key string, v any) (ok bool, err error) {
 	if found {
 		if err := yaml.NodeToValue(node, v, yaml.Strict()); err != nil {
 			return true, fmt.Errorf("%s: %s: %w", c.path, key, err)
+		}
+	}
+
+	// The environment, over the file and under the command line. Applied here
+	// rather than at ReadEnv for the reason Override gives: the file's own
+	// section is decoded first, and there is nothing to win over until a target
+	// or backend asks for it.
+	if len(env) > 0 {
+		used, err := c.applyEnv(key, v)
+		if err != nil {
+			return true, err
+		}
+		for _, name := range used {
+			c.envRead[name] = key
 		}
 	}
 
@@ -122,6 +146,7 @@ func (c *Config) Claimants() []Claimant {
 				return ok
 			}(),
 			Overridden: len(c.overrides[k]) > 0,
+			FromEnv:    c.sectionReadEnv(k),
 		})
 	}
 	return out
@@ -138,4 +163,18 @@ type Claimant struct {
 	FromFile bool
 	// Overridden reports whether an `opt=` named it.
 	Overridden bool
+	// FromEnv is the CALQUE_ names that reached it, sorted.
+	FromEnv []string
+}
+
+// sectionReadEnv is the environment variables that reached one section.
+func (c *Config) sectionReadEnv(section string) []string {
+	var out []string
+	for name, s := range c.envRead {
+		if s == section {
+			out = append(out, name)
+		}
+	}
+	sort.Strings(out)
+	return out
 }

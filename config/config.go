@@ -61,6 +61,12 @@ type Config struct {
 	// effective configuration can be shown without this package knowing any
 	// target's option type. See Section.
 	claimants map[string]any
+	// environ is what ReadEnv was told, keyed by variable name; envRead is
+	// which of them reached a section; envNames is what each section answers
+	// to. See env.go.
+	environ  map[string]string
+	envRead  map[string]string
+	envNames map[string][]string
 }
 
 // TargetConfig is one thing to generate.
@@ -130,6 +136,9 @@ func Parse(b []byte, name string) (*Config, error) {
 		claimed:   map[string]bool{},
 		overrides: map[string][]override{},
 		claimants: map[string]any{},
+		environ:   map[string]string{},
+		envRead:   map[string]string{},
+		envNames:  map[string][]string{},
 	}
 
 	// Duplicate keys, core or extension, are a parse error: goccy rejects them

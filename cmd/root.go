@@ -27,17 +27,21 @@ import (
 	"github.com/heojeongbo/calque/gen"
 )
 
-// NewCmdRoot builds the command tree around a registry.
+// NewCmdRoot builds the command tree around a registry and an environment.
 //
-// The registry is a parameter rather than something read from a context: it is
-// decided at composition time, in main, and a lookup for a value known there
-// buys nothing but a Must that panics.
+// Both are parameters rather than things read from a context or from the
+// process. The registry is decided at composition time, in main, and a lookup
+// for a value known there buys nothing but a Must that panics. environ is what
+// os.Environ returns, and passing it is what lets a test say what the
+// environment is instead of inheriting the machine it runs on -- which for a
+// generator that reads CALQUE_* is the difference between a test suite and a
+// description of one developer's shell.
 //
-// It is also how a fork extends calque without forking. Adding a target is a
-// line in your own main:
+// The registry is also how a fork extends calque without forking. Adding a
+// target is a line in your own main:
 //
-//	cmd.NewCmdRoot(cmd.Registry().Target(mylang.New()).Backend(mystore.New()))
-func NewCmdRoot(r *gen.Registry) *xli.Command {
+//	cmd.NewCmdRoot(cmd.Registry().Target(mylang.New()), os.Environ())
+func NewCmdRoot(r *gen.Registry, environ []string) *xli.Command {
 	return &xli.Command{
 		Name:  "calque",
 		Brief: "generate ORM code from orm-annotated .proto files",
@@ -48,11 +52,11 @@ func NewCmdRoot(r *gen.Registry) *xli.Command {
 		Commands: xli.Commands{
 			NewCmdVersion(),
 			NewCmdTargets(r),
-			NewCmdConfig(r),
+			NewCmdConfig(r, environ),
 		},
 
 		// OnRun and not OnRunPass: it fires only when this command is the leaf,
 		// which is exactly "buf invoked us with nothing".
-		Handler: xli.OnRun(serve(r)),
+		Handler: xli.OnRun(serve(r, environ)),
 	}
 }

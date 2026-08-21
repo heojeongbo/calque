@@ -20,7 +20,7 @@ import (
 // cmd/serve_test.go drive the whole plugin — request in, response out —
 // without a pipe, which nothing could do while this was a call to os.Stdin in
 // main.
-func serve(r *gen.Registry) xli.HandlerFunc {
+func serve(r *gen.Registry, environ []string) xli.HandlerFunc {
 	return func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 		// Read here rather than handing plugin.Serve the reader, because a
 		// person who typed `calque` deserves a sentence instead of a
@@ -40,7 +40,7 @@ func serve(r *gen.Registry) xli.HandlerFunc {
 					"try `calque --help` for what a person can ask it")
 		}
 
-		if err := plugin.Serve(bytes.NewReader(in), cmd, cmd.ErrWriter, r); err != nil {
+		if err := plugin.Serve(bytes.NewReader(in), cmd, cmd.ErrWriter, environ, r); err != nil {
 			return err
 		}
 		return next(ctx)
