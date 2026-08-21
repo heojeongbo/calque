@@ -16,7 +16,7 @@
       "description": "What to generate. Each entry pairs a language target with a storage backend. Two entries may name the same target, if one of them is given a distinct `name`.",
       "items": {
         "type": "object",
-        "required": ["target", "backend"],
+        "required": ["target"],
         "additionalProperties": false,
         "properties": {
           "target": {
@@ -28,7 +28,7 @@
           "backend": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]*$",
-            "description": "A storage backend registered in the calque binary being run. The target must support it: pairing a language with a store its runtime has no adapter for is refused at generate time, not discovered at import time.",
+            "description": "A storage backend registered in the calque binary being run. The target must support it: pairing a language with a store its runtime has no adapter for is refused at generate time, not discovered at import time. Required for every target but a storeless one -- output that describes no store takes no backend, and naming one for it is an error. Which targets are storeless depends on the binary, so this schema cannot require it and calque checks instead.",
             "examples": ["dexie", "entsql"]
           },
           "out": {
