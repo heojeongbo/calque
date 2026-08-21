@@ -16,6 +16,18 @@ import (
 // makes a typo inside the section loud; UnclaimedSections is what makes a typo
 // in the section *name* loud.
 func (c *Config) Section(key string, v any) (ok bool, err error) {
+	// Remembered before the early return, and remembered whether or not
+	// anything was decoded into it.
+	//
+	// A section's Go type belongs to whoever claims it -- *ts.Options lives in
+	// target/ts -- so this package cannot name one and could never render the
+	// effective configuration by itself. It does not have to: the caller hands
+	// it a pointer and then goes on mutating that same value, applying its own
+	// defaults after this returns. Keeping the pointer is what lets
+	// `calque config` print what the run will actually use, defaults included,
+	// without any target having to say anything new.
+	c.claimants[key] = v
+
 	node, found := c.extra[key]
 	overrides := c.overrides[key]
 	if !found && len(overrides) == 0 {
@@ -83,4 +95,47 @@ func quoteAll(ss []string) []string {
 		out[i] = fmt.Sprintf("%q", s)
 	}
 	return out
+}
+
+// Claimants is what every section that was offered decoded into, keyed by
+// section name and sorted by it.
+//
+// The values are the pointers the claimants passed to Section and have gone on
+// filling in since, so this is the effective configuration and not the file's
+// half of it. It is for `calque config`, which is the only caller: a target
+// asking what another target was configured with would be reaching across a
+// seam that exists.
+func (c *Config) Claimants() []Claimant {
+	keys := make([]string, 0, len(c.claimants))
+	for k := range c.claimants {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	out := make([]Claimant, 0, len(keys))
+	for _, k := range keys {
+		out = append(out, Claimant{
+			Section: k,
+			Options: c.claimants[k],
+			FromFile: func() bool {
+				_, ok := c.extra[k]
+				return ok
+			}(),
+			Overridden: len(c.overrides[k]) > 0,
+		})
+	}
+	return out
+}
+
+// Claimant is one section and what it was decoded into.
+type Claimant struct {
+	// Section is the top-level key, which is also the target's or backend's
+	// own name.
+	Section string
+	// Options is the pointer the claimant passed to Section.
+	Options any
+	// FromFile reports whether the config file had this section at all.
+	FromFile bool
+	// Overridden reports whether an `opt=` named it.
+	Overridden bool
 }

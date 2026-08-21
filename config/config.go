@@ -57,6 +57,10 @@ type Config struct {
 	// overrides are settings from the command line, keyed by section. They are
 	// applied on top of the file, per section, when it is claimed.
 	overrides map[string][]override
+	// claimants is what each offered section decoded into, so that the
+	// effective configuration can be shown without this package knowing any
+	// target's option type. See Section.
+	claimants map[string]any
 }
 
 // TargetConfig is one thing to generate.
@@ -125,6 +129,7 @@ func Parse(b []byte, name string) (*Config, error) {
 		extra:     map[string]ast.Node{},
 		claimed:   map[string]bool{},
 		overrides: map[string][]override{},
+		claimants: map[string]any{},
 	}
 
 	// Duplicate keys, core or extension, are a parse error: goccy rejects them

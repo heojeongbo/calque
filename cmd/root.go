@@ -48,6 +48,7 @@ func NewCmdRoot(r *gen.Registry) *xli.Command {
 		Commands: xli.Commands{
 			NewCmdVersion(),
 			NewCmdTargets(r),
+			NewCmdConfig(r),
 		},
 
 		// OnRun and not OnRunPass: it fires only when this command is the leaf,
