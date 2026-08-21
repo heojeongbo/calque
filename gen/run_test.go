@@ -1,6 +1,7 @@
 package gen_test
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
@@ -380,4 +381,42 @@ func TestBackendIsRequiredForAnythingElse(t *testing.T) {
 	_, err := gen.Run(s, config(t, "version: 1\ntargets:\n  - target: ts\n"), r)
 	require.ErrorContains(t, err, "`backend` is required")
 	require.ErrorContains(t, err, "only a storeless target may omit it")
+}
+
+// TestAnAcceptedShortfallIsStillReported is why WithProgress and WithWarnings
+// are two options and not one.
+//
+// A backend that accepts a shortfall has agreed to live with it, not to stop
+// hearing about it: the constraint the store cannot hold is a fact about the
+// output, and it is reported on every build. `quiet=` turns progress off and
+// reaches this not at all -- which the plugin spells by passing a discarding
+// Progress and the real stderr.
+func TestAnAcceptedShortfallIsStillReported(t *testing.T) {
+	s := fixtureSchema(t)
+	lenient := documentStore()
+	lenient.lenient = true
+
+	r := gen.NewRegistry().Target(&fakeTarget{name: "ts"}).Backend(lenient)
+
+	var warnings, progress bytes.Buffer
+	_, err := gen.Run(s, config(t, "version: 1\ntargets:\n  - {target: ts, backend: doc}\n"), r,
+		gen.WithWarnings(&warnings),
+		gen.WithProgress(gen.NewProgress(&progress)))
+	require.NoError(t, err, "a lenient backend generates rather than refusing")
+
+	require.Contains(t, warnings.String(), "cannot enforce a unique index over 2 properties")
+	require.NotContains(t, progress.String(), "unique",
+		"a warning belongs on the stream `quiet` cannot switch off")
+
+	// And with progress discarded -- what `quiet=true` does -- the warning is
+	// still there.
+	warnings.Reset()
+	lenient2 := documentStore()
+	lenient2.lenient = true
+	r2 := gen.NewRegistry().Target(&fakeTarget{name: "ts"}).Backend(lenient2)
+	_, err = gen.Run(s, config(t, "version: 1\ntargets:\n  - {target: ts, backend: doc}\n"), r2,
+		gen.WithWarnings(&warnings),
+		gen.WithProgress(gen.NewProgress(nil)))
+	require.NoError(t, err)
+	require.Contains(t, warnings.String(), "cannot enforce a unique index")
 }

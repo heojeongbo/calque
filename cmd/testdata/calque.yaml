@@ -1,0 +1,8 @@
+# The config cmd/serve_test.go points the plugin at.
+#
+# Deliberately the same pair target/ts/golden_test.go uses, so that what comes
+# out of the plugin boundary is the tree that test already pins byte for byte.
+version: 1
+
+targets:
+  - {target: ts, backend: dexie}

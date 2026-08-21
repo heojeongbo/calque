@@ -8,40 +8,25 @@
 //	    out: gen
 //	    opt: [config=calque.yaml]
 //
-// The targets and backends a given binary knows are the ones registered below,
-// at composition time. There is no config-driven loading of third-party ones:
-// Go's runtime plugin support is Linux-only and requires an identical toolchain
-// and identical build flags, which is a worse contract than a twenty-five line
-// program that imports what it wants and calls Serve.
+// The command tree, the registry it is composed from, and why the CLI lives in
+// one package are all in [github.com/heojeongbo/calque/cmd].
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
-	"github.com/heojeongbo/calque/backend/dexie"
-	"github.com/heojeongbo/calque/backend/entsql"
-	"github.com/heojeongbo/calque/gen"
-	"github.com/heojeongbo/calque/plugin"
-	"github.com/heojeongbo/calque/target/gotarget"
-	"github.com/heojeongbo/calque/target/service"
-	"github.com/heojeongbo/calque/target/ts"
+	"github.com/heojeongbo/calque/cmd"
 )
 
 func main() {
-	if err := plugin.Serve(os.Stdin, os.Stdout, os.Stderr, registry()); err != nil {
+	c := cmd.NewCmdRoot(cmd.Registry())
+	if err := c.Run(context.Background(), os.Args[1:]); err != nil {
+		// "calque:" and not "error:", because buf interleaves a plugin's
+		// stderr with its own and an unattributed line is not attributable.
+		// Every other line this program writes is prefixed the same way.
 		fmt.Fprintln(os.Stderr, "calque:", err)
 		os.Exit(1)
 	}
-}
-
-// registry is the composition point. Adding a target or a backend is a line
-// here and nothing else.
-func registry() *gen.Registry {
-	return gen.NewRegistry().
-		Target(ts.New()).
-		Target(gotarget.New()).
-		Target(service.New()).
-		Backend(dexie.New()).
-		Backend(entsql.New())
 }

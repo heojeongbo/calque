@@ -1,0 +1,7 @@
+# A config that names a target no build has. It is here so that a test can
+# prove the plugin reports a bad config the way buf can show it -- in
+# response.error, with the process exiting 0 -- rather than by crashing.
+version: 1
+
+targets:
+  - {target: nope, backend: dexie}
