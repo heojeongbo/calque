@@ -51,10 +51,6 @@ func (f *File) P(args ...any) {
 	f.b.WriteByte('\n')
 }
 
-// Raw writes exactly what it is given, with no newline. It is for the rare line
-// assembled in pieces.
-func (f *File) Raw(s string) { f.b.WriteString(s) }
-
 // Len is how many bytes have been written.
 func (f *File) Len() int { return f.b.Len() }
 

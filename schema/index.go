@@ -67,9 +67,6 @@ func (i *Index) Number() int32 {
 // Props are the index members, in declared order. Never empty after Build.
 func (i *Index) Props() []Prop { return i.props }
 
-// Refs are the members as they were written.
-func (i *Index) Refs() []Ref { return i.spec.Refs }
-
 // IsComposite reports whether the index spans more than one prop, which is the
 // question a backend asks when deciding whether it can enforce uniqueness.
 func (i *Index) IsComposite() bool { return len(i.props) > 1 }

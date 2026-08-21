@@ -198,16 +198,17 @@ Stated because a reader will find them and assume they do something.
 - **`Table.Extra`** is a JSON-able bag for anything a runtime adapter needs that
   the neutral schema cannot say. Both backends fill it. **No target reads it** —
   both call concrete backend methods instead.
-- **`(orm.edge)`'s `bind:`** is parsed and carried on `EdgeSpec`. Nothing reads
-  it.
 
-There used to be a third: `query.Derive`, a plan AST that turned an entity into
-its lookups, arguments, guards and assignments, with tests and no callers. It
-was removed rather than kept, because a seam that has been unwired long enough
-to be documented as unwired is a design nobody has had to keep honest. What
-conformance item 2 needs is still needed; it will be built against the target
-that uses it, and there is a note in this section rather than a package
-pretending the work is half done.
+There were three more, and they are gone rather than listed. `query.Derive` was
+a plan AST turning an entity into its lookups, arguments, guards and
+assignments, with tests and no callers. `(orm.edge)`'s `bind:` was parsed onto
+`EdgeSpec` and read by nothing — it still parses, because a schema that carries
+one is not wrong, but it is not carried any further. `Index.Refs()`,
+`StorePath.Equal()` and `tsw.Raw()` were written for a caller who never came.
+
+A seam that has been unwired long enough to be documented as unwired is not a
+seam; it is a design nobody has had to keep honest. What conformance item 2
+needs is still needed, and it gets built against the target that consumes it.
 
 ## Target-specific backend extensions
 

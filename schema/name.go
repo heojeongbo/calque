@@ -57,19 +57,6 @@ func (p StorePath) String() string {
 	return strings.Join(parts, ".")
 }
 
-// Equal reports whether two paths name the same place.
-func (p StorePath) Equal(q StorePath) bool {
-	if len(p) != len(q) {
-		return false
-	}
-	for i := range p {
-		if p[i] != q[i] {
-			return false
-		}
-	}
-	return true
-}
-
 // Names is every name a prop has.
 //
 // There is deliberately no Name() string on Prop. A caller has to say which

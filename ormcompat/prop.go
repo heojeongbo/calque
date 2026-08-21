@@ -217,10 +217,10 @@ func parseEdge(fd protoreflect.FieldDescriptor, eo *ormopt.EdgeOptions, at *sche
 		spec.FromName = eo.GetFrom().GetName()
 		spec.FromNumber = eo.GetFrom().GetNumber()
 	}
-	if eo.HasBind() {
-		spec.BindName = eo.GetBind().GetName()
-		spec.BindNumber = eo.GetBind().GetNumber()
-	}
+	// `bind:` is read and dropped. It is in the vocabulary, so it has to parse
+	// without error -- a schema that carries one is not wrong -- but nothing
+	// downstream asks what it says, and carrying it on EdgeSpec only made it
+	// look otherwise.
 
 	return &parsed{isEdge: true, edge: spec}
 }

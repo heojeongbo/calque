@@ -97,7 +97,7 @@ Tenant tenant = 2 [(orm.edge) = {}];
 | field | type | means |
 |---|---|---|
 | `disabled` | bool | not stored |
-| `bind` | `Ref` | reserved; parsed and carried, and no target reads it yet |
+| `bind` | `Ref` | reserved; accepted so a schema carrying one is not refused, and read by nothing |
 | `from` | `Ref` | this edge is the back reference of a named edge on the target |
 | `unique` | bool | unique, and therefore a way to look a row up |
 | `nullable` | bool | may be null |

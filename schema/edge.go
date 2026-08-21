@@ -17,11 +17,6 @@ type EdgeSpec struct {
 	FromName   string
 	FromNumber int32
 
-	// BindName and BindNumber are the `bind:` ref. Parsed and carried; no
-	// built-in target reads it yet, and calque says so rather than pretending.
-	BindName   string
-	BindNumber int32
-
 	List      bool
 	Unique    bool
 	Nullable  bool
