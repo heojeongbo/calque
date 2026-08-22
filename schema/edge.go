@@ -1,6 +1,10 @@
 package schema
 
-import "google.golang.org/protobuf/reflect/protoreflect"
+import (
+	"fmt"
+
+	"google.golang.org/protobuf/reflect/protoreflect"
+)
 
 // EdgeSpec is what an Edge is built from.
 type EdgeSpec struct {
@@ -68,6 +72,27 @@ func (e *Edge) Type() Type { return TypeMessage }
 
 // Target is the entity this edge points at. Never nil after Build.
 func (e *Edge) Target() *Entity { return e.target }
+
+// TargetKey is the key an edge is stored as: its target's.
+//
+// "An edge is stored as a reference to its target's key" is the sentence this
+// type's doc opens with, and until this method existed it was guarded in five
+// places with five messages -- one of them in the core, spelled as a silent nil
+// return. A rule stated once and checked five ways is a rule with four chances
+// to be checked differently.
+//
+// It reports rather than returning nil because a caller that reaches here holds
+// a schema Build accepted, so a missing key is a bug worth a message rather than
+// a value worth handling.
+func (e *Edge) TargetKey() (*Field, error) {
+	if e.target == nil {
+		return nil, fmt.Errorf("%s points at nothing", e.Name())
+	}
+	if e.target.Key() == nil {
+		return nil, fmt.Errorf("%s points at an entity with no key", e.Name())
+	}
+	return e.target.Key(), nil
+}
 
 // Inverse is the edge this one declared itself the back-reference of, via
 // `from:`, or nil.
