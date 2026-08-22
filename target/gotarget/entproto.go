@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/gofeaturespb"
 
+	"github.com/heojeongbo/calque/gen"
 	"github.com/heojeongbo/calque/schema"
 )
 
@@ -51,8 +52,7 @@ func (e *emitter) emitEntProto() error {
 	for _, grp := range groups {
 		dir := strings.TrimSuffix(grp.path, "/"+lastSegment(grp.path))
 		gf := e.pg.NewGeneratedFile(grp.path, protogen.GoImportPath(dir))
-		gf.P(e.target.opts.Header)
-		gf.P("// source: ", grp.source)
+		gen.Preamble(gf, e.target.opts.Header, grp.source)
 		gf.P()
 		gf.P("package ", lastSegment(dir))
 		gf.P()

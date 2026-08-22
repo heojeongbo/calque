@@ -89,10 +89,9 @@ func (t *Target) Backends() []string { return []string{"entsql"} }
 
 func (t *Target) Configure(cfg *gen.Config, section string) error {
 	var opts Options
-	if _, err := cfg.Section(section, &opts); err != nil {
+	if err := gen.Claim(cfg, section, &opts, (*Options).setDefaults); err != nil {
 		return err
 	}
-	opts.setDefaults()
 	t.opts = opts
 	return nil
 }

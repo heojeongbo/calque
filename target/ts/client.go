@@ -21,7 +21,7 @@ func (t *Target) emitClient(g *gen.Generator, p *pkg) ([]byte, error) {
 	services := orderedServices(p)
 
 	f := tsw.New()
-	f.P(t.opts.Header)
+	gen.Preamble(f, t.opts.Header, "")
 	f.P()
 	f.P(`import type { Client as C } from "@connectrpc/connect";`)
 	f.P(`import type { QueryDescOf } from "`, t.opts.Runtime, `";`)

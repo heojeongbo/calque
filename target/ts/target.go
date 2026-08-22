@@ -64,10 +64,9 @@ func (t *Target) Backends() []string { return []string{"dexie"} }
 
 func (t *Target) Configure(cfg *gen.Config, section string) error {
 	var opts Options
-	if _, err := cfg.Section(section, &opts); err != nil {
+	if err := gen.Claim(cfg, section, &opts, (*Options).setDefaults); err != nil {
 		return err
 	}
-	opts.setDefaults()
 	t.opts = opts
 	return nil
 }
@@ -381,7 +380,7 @@ func orderedServices(p *pkg) []protoreflect.ServiceDescriptor { return p.service
 // service map, and the schema map the application feeds to Dexie.
 func (t *Target) emitDb(p *pkg) []byte {
 	f := tsw.New()
-	f.P(t.opts.Header)
+	gen.Preamble(f, t.opts.Header, "")
 	f.P()
 
 	for _, e := range p.entities {
