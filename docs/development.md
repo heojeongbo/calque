@@ -160,12 +160,14 @@ were. Run both.
 | `schema/` | the neutral IR: entities, props, indexes, names, diagnostics |
 | `config/` | `calque.yaml`: the document, its sections, and the `opt=` overrides. The only package that reads YAML |
 | `gen/` | the generator core: `Target`, `Backend`, capabilities, output |
-| `backend/dexie/`, `backend/entsql/` | storage decisions |
-| `target/ts/`, `target/gotarget/`, `target/service/` | emission |
+| `backend/dexie/`, `backend/entsql/`, `backend/grdb/` | storage decisions |
+| `gentest/` | the contract every backend has to meet, and where one writes down its own answers |
+| `target/ts/`, `target/gotarget/`, `target/service/`, `target/swifttarget/` | emission |
 | `internal/policy/` | checks about the shape of the repository, not its behaviour |
-| `internal/linew/` | the line writer both emitters use. Changing it changes two generators' output |
+| `internal/linew/` | the line writer every emitter uses. Changing it changes three generators' output |
 | `internal/tsw/` | TypeScript's half: a name's first letter, and a string literal |
 | `internal/prow/` | `.proto`'s half: a string literal, a field line, a comment |
+| `internal/swiftw/` | Swift's half: four-space depth, and a string literal |
 | `internal/entname/` | ent's casing, copied and pinned |
 | `internal/protoc/` | in-process proto compilation, for tests |
 | `plugin/` | the protoc-plugin boundary: a request in, a response out |

@@ -198,8 +198,15 @@ which it did, once.
 Stated because a reader will find them and assume they do something.
 
 - **`Table.Extra`** is a JSON-able bag for anything a runtime adapter needs that
-  the neutral schema cannot say. Both backends fill it. **No target reads it** —
-  both call concrete backend methods instead.
+  the neutral schema cannot say. All three backends fill it. **No target reads
+  it** — each calls a concrete backend method instead.
+
+  It was briefly read: the Swift target took its table name from
+  `Extra["table"]`, and this entry went stale saying nobody did. The map is
+  `any`-valued, so a renamed key would have printed `%!q(<nil>)` into a `.swift`
+  file with nothing failing — and `grdb.TableName` was already there, on a
+  backend that target had already asserted. It asks that instead, and this is a
+  seam again.
 
 There were three more, and they are gone rather than listed. `query.Derive` was
 a plan AST turning an entity into its lookups, arguments, guards and
@@ -207,6 +214,14 @@ assignments, with tests and no callers. `(orm.edge)`'s `bind:` was parsed onto
 `EdgeSpec` and read by nothing — it still parses, because a schema that carries
 one is not wrong, but it is not carried any further. `Index.Refs()`,
 `StorePath.Equal()` and `tsw.Raw()` were written for a caller who never came.
+
+`Backend.StorePath` was very nearly a fourth. It was on the interface, the core
+never called it, and its one caller was a backend's own helper — while the Dexie
+backend computed the same edge path a second time, in its schema-string
+visitors, because that was easier than reaching for the answer it had already
+given. The two agreed only because every key in the corpus is `id`. The schema
+string reads `StorePath` now, which is what makes the entry on the interface a
+fact rather than a claim.
 
 A seam that has been unwired long enough to be documented as unwired is not a
 seam; it is a design nobody has had to keep honest. What conformance item 2
