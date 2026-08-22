@@ -21,7 +21,7 @@ func (t *Target) emitEntity(g *gen.Generator, b *dexie.Backend, e *entity) ([]by
 	}
 
 	f := tsw.New()
-	f.P(t.opts.Header)
+	gen.Preamble(f, t.opts.Header, "")
 	f.P()
 
 	// The first four imports end in a semicolon and the last three do not. That

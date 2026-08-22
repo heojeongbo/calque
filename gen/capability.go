@@ -2,6 +2,7 @@ package gen
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -84,6 +85,37 @@ func (s Shortfalls) Err() error {
 		parts[i] = sf.String()
 	}
 	return fmt.Errorf("%s", strings.Join(parts, "\n"))
+}
+
+// Accept is the shortfall kinds a backend was configured to live with, as the
+// config spells them.
+//
+// It is a type rather than a []string because the twelve lines that validate one
+// were written twice, verbatim, and the reason they exist is subtle enough to be
+// worth stating once: a misspelled kind would accept nothing while looking like
+// it accepted something, so the option would read as a decision somebody made
+// and behave as one nobody did.
+type Accept []string
+
+// Validate refuses a kind this build does not know, naming the claimant that was
+// configured with it and listing what calque understands.
+func (a Accept) Validate(claimant string) error {
+	known := map[string]bool{}
+	for _, k := range AllShortfallKinds() {
+		known[string(k)] = true
+	}
+	for _, name := range a {
+		if !known[name] {
+			return fmt.Errorf("%s: accept %q is not a shortfall kind\n\tcalque knows: %s",
+				claimant, name, strings.Join(ShortfallKindNames(), ", "))
+		}
+	}
+	return nil
+}
+
+// Accepts reports whether this kind was named.
+func (a Accept) Accepts(k ShortfallKind) bool {
+	return slices.Contains(a, string(k))
 }
 
 // ShortfallAccepter is a backend that decides per kind rather than all at once.
@@ -206,10 +238,11 @@ func checkIndex(idx *schema.Index, caps Capabilities, backend, at string) Shortf
 func checkMember(p schema.Prop, where, backend string) Shortfalls {
 	t := p.Type()
 	if edge, ok := p.(*schema.Edge); ok {
-		if edge.Target() == nil || edge.Target().Key() == nil {
+		key, err := edge.TargetKey()
+		if err != nil {
 			return nil // Build reports this; it is not a capability question.
 		}
-		t = edge.Target().Key().Type()
+		t = key.Type()
 	}
 	if t.IsOrderable() {
 		return nil

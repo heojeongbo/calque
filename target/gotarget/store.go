@@ -6,6 +6,7 @@ import (
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
+	"github.com/heojeongbo/calque/gen"
 	"github.com/heojeongbo/calque/schema"
 )
 
@@ -49,7 +50,7 @@ func (e *emitter) emitStore() error {
 	}
 	dir := string(f.GoImportPath)
 	gf := e.pg.NewGeneratedFile(dir+"/store.g.go", f.GoImportPath)
-	gf.P(e.target.opts.QueryHeader)
+	gen.Preamble(gf, e.target.opts.QueryHeader, "")
 	gf.P()
 	gf.P("package ", lastSegment(dir))
 	gf.P()

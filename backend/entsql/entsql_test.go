@@ -7,32 +7,42 @@ import (
 
 	"github.com/heojeongbo/calque/backend/entsql"
 	"github.com/heojeongbo/calque/gen"
-	"github.com/heojeongbo/calque/internal/protoc"
-	"github.com/heojeongbo/calque/ormcompat"
+	"github.com/heojeongbo/calque/gentest"
 	"github.com/heojeongbo/calque/schema"
 )
 
-func parse(t *testing.T, file string) *schema.Schema {
-	t.Helper()
-	req, err := protoc.CompileRequest(t.Context(),
-		[]string{"../../testdata/proto/valid", "../../testdata/proto/_upstream"}, "", file)
-	require.NoError(t, err)
-	s, err := ormcompat.Parse(req)
-	require.NoError(t, err)
-	return s
-}
-
-func entity(t *testing.T, s *schema.Schema, name string) *schema.Entity {
-	t.Helper()
-	e, ok := s.Get(name)
-	require.True(t, ok)
-	return e
+// TestContract is what every backend has to hold, plus what this one decided.
+func TestContract(t *testing.T) {
+	gentest.Run(t, gentest.Case{
+		Backend: entsql.New(),
+		Paths: map[string]schema.StorePath{
+			"apptest.User.id": {"id"},
+			// ent's own convention: the owner and the edge, not the edge and
+			// `_id`. grdb spells the same edge `tenant_id`, and grdb_test says
+			// so -- the two are written down in two tests rather than asserted
+			// to agree in a comment, which is how they came to disagree while a
+			// comment said they did not.
+			"apptest.User.tenant": {"user_tenant"},
+		},
+		Codecs: map[string]gen.CodecName{
+			"apptest.User.id": gen.CodecUUIDString,
+			// A native time, where grdb stores epoch millis: SQL has a time
+			// type and SQLite does not.
+			"apptest.User.date_updated": gen.CodecTimeNative,
+			"apptest.User.labels":       gen.CodecJSON,
+			"apptest.User.profile":      gen.CodecJSON,
+			"apptest.User.tenant":       gen.CodecUUIDString,
+		},
+		Extra: map[string]map[string]any{
+			"apptest.User": {"dialect": "sqlite"},
+		},
+	})
 }
 
 // TestHoldsWhatDexieCannot is the comparison docs/conformance.md item 3 is
 // about, from the other side.
 func TestHoldsWhatDexieCannot(t *testing.T) {
-	s := parse(t, "apptest.proto")
+	s := gentest.Schema(t, "apptest.proto")
 	require.Empty(t, gen.CheckCapabilities(s, entsql.New()),
 		"ent writes index.Fields(...).Edges(...).Unique() and the database holds it")
 
@@ -45,8 +55,8 @@ func TestHoldsWhatDexieCannot(t *testing.T) {
 // TestEdgeIsAColumnNotAPath: an edge becomes one foreign-key column, which is
 // where this backend and Dexie's nested key path genuinely differ.
 func TestEdgeIsAColumnNotAPath(t *testing.T) {
-	s := parse(t, "apptest.proto")
-	user := entity(t, s, "apptest.User")
+	s := gentest.Schema(t, "apptest.proto")
+	user := gentest.Entity(t, s, "apptest.User")
 	tenant, ok := user.Prop("tenant")
 	require.True(t, ok)
 
@@ -58,17 +68,17 @@ func TestEdgeIsAColumnNotAPath(t *testing.T) {
 // TestTableNameIsPinned: ent's own default is a snake-cased plural, so leaving
 // it alone would rename every table.
 func TestTableNameIsPinned(t *testing.T) {
-	s := parse(t, "apptest.proto")
+	s := gentest.Schema(t, "apptest.proto")
 	b := entsql.New()
-	require.Equal(t, "user", b.TableName(entity(t, s, "apptest.User")))
-	require.Equal(t, "tenant", b.TableName(entity(t, s, "apptest.Tenant")))
+	require.Equal(t, "user", b.TableName(gentest.Entity(t, s, "apptest.User")))
+	require.Equal(t, "tenant", b.TableName(gentest.Entity(t, s, "apptest.Tenant")))
 }
 
 // TestUUIDAgreesWithDexie is conformance item 7: both stores hold the same
 // canonical text, and they agree by naming one codec rather than by accident.
 func TestUUIDAgreesWithDexie(t *testing.T) {
-	s := parse(t, "apptest.proto")
-	codec, err := entsql.New().Codec(entity(t, s, "apptest.User").Key())
+	s := gentest.Schema(t, "apptest.proto")
+	codec, err := entsql.New().Codec(gentest.Entity(t, s, "apptest.User").Key())
 	require.NoError(t, err)
 	require.Equal(t, gen.CodecUUIDString, codec)
 }
@@ -96,8 +106,8 @@ func TestDialectIsChecked(t *testing.T) {
 // TestEntIdentIsNotProtocsIdent: the two disagree exactly on initialisms, and
 // the Go target has to spell a field both ways.
 func TestEntIdentIsNotProtocsIdent(t *testing.T) {
-	s := parse(t, "naming.proto")
-	e := entity(t, s, "namingtest.Device")
+	s := gentest.Schema(t, "naming.proto")
+	e := gentest.Entity(t, s, "namingtest.Device")
 	p, ok := e.Prop("device_id")
 	require.True(t, ok)
 

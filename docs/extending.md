@@ -109,7 +109,24 @@ func (b *Backend) Accepts(kind gen.ShortfallKind) bool
 ```
 
 Implement it and `gen.Run` asks per kind instead of consulting `Strict`. Do not
-implement it and nothing changes. It is not on `gen.Backend` for the same reason
+implement it and nothing changes.
+
+`gen.Accept` is the config side of it — a `[]string` that validates the names it
+was given and answers per kind, so the twelve lines that refuse a misspelled one
+are written once:
+
+```go
+type Options struct {
+	Accept gen.Accept `yaml:"accept"`
+}
+
+// in Configure, after Claim:
+if err := o.Accept.Validate("mystore"); err != nil {
+	return err
+}
+
+func (b *Backend) Accepts(kind gen.ShortfallKind) bool { return b.opts.Accept.Accepts(kind) }
+``` It is not on `gen.Backend` for the same reason
 `EntIdent` is not: a store with no opinion should not have to answer.
 
 The kinds are `unique_compound_index`, `partial_index`, `index_arity`,
@@ -122,22 +139,58 @@ every build.
 ```go
 func (b *Backend) Configure(cfg *gen.Config, section string) error {
 	var o Options
-	if _, err := cfg.Section(section, &o); err != nil {
+	if err := gen.Claim(cfg, section, &o, (*Options).setDefaults); err != nil {
 		return err
 	}
-	o.setDefaults()
 	b.opts = o
 	return nil
 }
 ```
 
-`Section` decodes strictly, so a typo inside your section is loud. Not finding
-the section is not an error — it means nobody configured you, and your defaults
+`Claim` decodes strictly, so a typo inside your section is loud. Not finding the
+section is not an error — it means nobody configured you, and your defaults
 stand.
+
+It takes a pointer and not a value, and that is load-bearing: `calque config`
+prints the *effective* settings by reading back what was decoded into, so a
+default applied to a copy afterwards is one that command cannot see.
+
+For an option with a fixed set of values, `gen.OneOf` is the rule three sections
+were spelling three ways — the zero value means the default, and anything
+unlisted is a typo rather than something nobody implemented yet:
+
+```go
+if _, err := gen.OneOf("mystore", "dialect", o.Dialect,
+	DialectSQLite, DialectSQLite, DialectPostgres); err != nil {
+	return err
+}
+```
 
 ### `StorePath` and `Codec`
 
 Where a prop lives in a record, and what transform its value goes through.
+
+`Codec` is a table, not a switch. Two rules are the same whatever store you are
+— an edge is stored as its target's key, so its codec is the target's; a type
+you do not name is stored as it arrives — and `gen.CodecTable` holds both, so
+what is left for you to write is the facts:
+
+```go
+var codecs = gen.CodecTable{
+	schema.TypeUUID:    gen.CodecUUIDString,
+	schema.TypeTime:    gen.CodecTimeEpochMillis,
+	schema.TypeJSON:    gen.CodecJSON,
+	schema.TypeMessage: gen.CodecJSON,
+}
+
+func (b *Backend) Codec(p schema.Prop) (gen.CodecName, error) { return codecs.Codec(p), nil }
+```
+
+`StorePath` is the only place a prop's store name is decided, and it is worth
+making it so rather than nearly so. The Dexie backend spent a while computing
+edge paths twice — once here and once in its schema string — and the two agreed
+only because every key in the corpus is `id`. If you render paths somewhere,
+render the ones this returned.
 
 ```go
 func (b *Backend) StorePath(p schema.Prop) (schema.StorePath, error) {
@@ -170,6 +223,18 @@ Turn the validated neutral schema into storage decisions: one `Table` per
 entity, holding a codec for every prop and whatever else your runtime adapter
 needs, in `Extra`.
 
+The loop is `gen.LowerTables`, so what you write is the `Extra`:
+
+```go
+func (b *Backend) Lower(s *schema.Schema) (*gen.Lowered, error) {
+	return gen.LowerTables(b, s, func(e *schema.Entity) (map[string]any, error) {
+		return map[string]any{"table": TableName(e)}, nil
+	})
+}
+```
+
+Pass `nil` if your runtime adapter needs nothing the neutral schema cannot say.
+
 `Table` is deliberately narrow, and it was not always. It used to carry a table
 name, a primary key, a list of indexes and a path per prop, modelled neutrally
 so a target could read them without knowing the store. No target ever did — the
@@ -183,8 +248,12 @@ where it can have the right type.
 `Capabilities`, and naming one you do not implement is an error saying it is a
 calque bug.
 
-Cover **`s.Entities()`**, not `s.Sources()`. An entity reachable only as an edge
-target is not emitted, but a target still asks what its key looks like.
+`LowerTables` covers **`s.Entities()`**, not `s.Sources()`: an entity reachable
+only as an edge target is not emitted, but a target still asks what its key
+looks like. This paragraph used to be the only thing enforcing that; `gentest`
+enforces it now, against a corpus file that imports its entities rather than
+declaring them, because a corpus where everything is generated cannot tell the
+two apart.
 
 Capability checking has already run, so an error here is a bug or a
 schema-specific limit your capability set was too coarse to state. Report it;
@@ -322,7 +391,43 @@ you cannot produce a specific byte, you cannot prove the swap is a no-op.
 The Go target uses `protogen.GeneratedFile`, which handles import management and
 runs gofmt — appropriate there, because gofmt output *is* the specific bytes.
 
-## Testing it
+## Testing a backend
+
+`gentest` is the contract, and running it is one call:
+
+```go
+func TestMyStore(t *testing.T) {
+	gentest.Run(t, gentest.Case{
+		Backend: mystore.New(),
+		Paths:   map[string]schema.StorePath{"apptest.User.tenant": {"tenant_id"}},
+		Codecs:  map[string]gen.CodecName{"apptest.User.date_updated": gen.CodecTimeEpochMillis},
+		Extra:   map[string]map[string]any{"apptest.User": {"table": "user"}},
+	})
+}
+```
+
+`gentest.Contract` — which `Run` calls first — checks what every backend has to
+hold whatever store it is: that its name can be written in a config, that it
+configures from a document saying nothing about it, that it refuses an option it
+does not know, that configuring twice says the same thing, that it lowers every
+entity rather than every *emitted* entity, that every codec it chose is one its
+`Capabilities` lists, and that it answers a store path for every prop in the
+corpus. Every one of those is a rule this page states in prose, and until
+`gentest` existed prose was all that held them: a backend could break all of them
+and `go test ./...` would be green, which is how the third one came to ship with
+no tests in its package at all.
+
+The `Case` fields are the other half — not invariants but *this* store's
+answers, written down. That is worth doing even where it feels like restating
+the obvious. `grdb` spells `User`'s tenant edge `tenant_id` and `entsql` spells
+it `user_tenant`; a comment in one of them claimed for months that they agreed,
+and it went unnoticed for exactly as long as the two spellings lived in two files
+nobody read together.
+
+`gentest` is not `internal/`, because this page promises a backend can live in
+your own module and a contract you cannot import is not one.
+
+## Testing a target
 
 Point the golden tests at your target. `target/ts/golden_test.go` compiles
 `testdata/proto/valid/*.proto` in process and compares against committed output;

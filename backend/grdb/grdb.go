@@ -14,7 +14,6 @@ package grdb
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/heojeongbo/calque/gen"
@@ -30,7 +29,7 @@ type Options struct {
 	// empty. It exists because a schema can still out-run a *specific* build of
 	// SQLite -- an old system library without partial indexes, say -- and the
 	// answer to that is naming the one shortfall, not turning strictness off.
-	Accept []string `yaml:"accept"`
+	Accept gen.Accept `yaml:"accept"`
 }
 
 // Backend is the GRDB backend.
@@ -45,21 +44,12 @@ func (b *Backend) Name() string { return "grdb" }
 
 func (b *Backend) Configure(cfg *gen.Config, section string) error {
 	var opts Options
-	if _, err := cfg.Section(section, &opts); err != nil {
+	if err := gen.Claim(cfg, section, &opts, nil); err != nil {
 		return err
 	}
 
-	// A misspelled kind would accept nothing while looking like it accepted
-	// something, which is the failure this option exists to avoid.
-	known := map[string]bool{}
-	for _, k := range gen.AllShortfallKinds() {
-		known[string(k)] = true
-	}
-	for _, name := range opts.Accept {
-		if !known[name] {
-			return fmt.Errorf("grdb: accept %q is not a shortfall kind\n\tcalque knows: %s",
-				name, strings.Join(gen.ShortfallKindNames(), ", "))
-		}
+	if err := opts.Accept.Validate("grdb"); err != nil {
+		return err
 	}
 
 	b.opts = opts
@@ -72,7 +62,7 @@ func (b *Backend) Strict() bool { return true }
 
 // Accepts refines Strict per kind, for the build of SQLite that cannot.
 func (b *Backend) Accepts(kind gen.ShortfallKind) bool {
-	return slices.Contains(b.opts.Accept, string(kind))
+	return b.opts.Accept.Accepts(kind)
 }
 
 // Capabilities states what SQLite holds.
@@ -101,9 +91,20 @@ func (b *Backend) Capabilities() gen.Capabilities {
 // StorePath is the column a prop lives in.
 //
 // A field is its own column. An edge is the target's key in a column named for
-// the edge with `_id`, which is the same shape entsql chooses -- so a row here
-// and a row there line up column for column, and a person reading both is not
-// translating between two spellings.
+// the edge with `_id`.
+//
+// This used to say that was the same shape entsql chooses, so a row here and a
+// row there line up column for column. It is not and they do not: entsql names
+// the same edge `user_tenant`, ent's owner-prefixed convention, and a test pins
+// that spelling because the deployed physical schema already has the column.
+// The two are two schemas with a sync layer between them, not one schema in two
+// places, and the layer maps names either way -- so this side is free to spell
+// it the way someone reading the device's database with the sqlite3 CLI would
+// guess.
+//
+// The claim is worth recording as false rather than deleting: two stores said
+// to agree and quietly not agreeing is the failure this whole generator exists
+// to convert into a message.
 func (b *Backend) StorePath(p schema.Prop) (schema.StorePath, error) {
 	return schema.VisitProp[schema.StorePath](p, storePathVisitor{})
 }
@@ -115,8 +116,8 @@ func (storePathVisitor) VisitField(f *schema.Field) (schema.StorePath, error) {
 }
 
 func (storePathVisitor) VisitEdge(e *schema.Edge) (schema.StorePath, error) {
-	if e.Target() == nil || e.Target().Key() == nil {
-		return nil, fmt.Errorf("grdb: %s points at an entity with no key", e.Name())
+	if _, err := e.TargetKey(); err != nil {
+		return nil, fmt.Errorf("grdb: %w", err)
 	}
 	return schema.StorePath{schema.StoreName(string(e.Names().Proto) + "_id")}, nil
 }
@@ -133,48 +134,19 @@ func (storePathVisitor) VisitEdge(e *schema.Edge) (schema.StorePath, error) {
 // to the runtime would mean GRDB's default -- a "YYYY-MM-DD HH:MM:SS.SSS"
 // string in an unstated zone -- and an unstated zone is how two devices disagree
 // about which of two writes is newer.
-func (b *Backend) Codec(p schema.Prop) (gen.CodecName, error) {
-	switch p.Type() {
-	case schema.TypeUUID:
-		return gen.CodecUUIDString, nil
-	case schema.TypeTime:
-		return gen.CodecTimeEpochMillis, nil
-	case schema.TypeJSON:
-		return gen.CodecJSON, nil
-	case schema.TypeMessage:
-		// An edge is stored as its target's key, so its codec is the target's.
-		if e, ok := p.(*schema.Edge); ok && e.Target() != nil && e.Target().Key() != nil {
-			return b.Codec(e.Target().Key())
-		}
-		return gen.CodecJSON, nil
-	default:
-		return gen.CodecIdentity, nil
-	}
+var codecs = gen.CodecTable{
+	schema.TypeUUID:    gen.CodecUUIDString,
+	schema.TypeTime:    gen.CodecTimeEpochMillis,
+	schema.TypeJSON:    gen.CodecJSON,
+	schema.TypeMessage: gen.CodecJSON,
 }
 
+func (b *Backend) Codec(p schema.Prop) (gen.CodecName, error) { return codecs.Codec(p), nil }
+
 func (b *Backend) Lower(s *schema.Schema) (*gen.Lowered, error) {
-	l := &gen.Lowered{Schema: s, Backend: b.Name(), Tables: map[*schema.Entity]*gen.Table{}}
-
-	for _, e := range s.Entities() {
-		if e.Key() == nil {
-			return nil, fmt.Errorf("grdb: %s has no key", e.FullName())
-		}
-
-		t := &gen.Table{
-			Entity: e,
-			Codec:  map[schema.Prop]gen.CodecName{},
-			Extra:  map[string]any{"table": TableName(e)},
-		}
-		for _, p := range e.Props() {
-			codec, err := b.Codec(p)
-			if err != nil {
-				return nil, fmt.Errorf("grdb: %s.%s: %w", e.FullName(), p.Name(), err)
-			}
-			t.Codec[p] = codec
-		}
-		l.Tables[e] = t
-	}
-	return l, nil
+	return gen.LowerTables(b, s, func(e *schema.Entity) (map[string]any, error) {
+		return map[string]any{"table": TableName(e)}, nil
+	})
 }
 
 // TableName is the table an entity lives in: snake_case, unpluralised.

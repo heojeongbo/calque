@@ -61,6 +61,27 @@ func isStoreless(t Target) bool {
 	return ok
 }
 
+// Printer is anything that writes one line at a time. internal/linew's File and
+// protogen's GeneratedFile are both one, which is what lets the two halves of
+// this generator share the line below.
+type Printer interface{ P(...any) }
+
+// Preamble writes the lines every generated file opens with: the header the
+// config chose, and where the file came from.
+//
+// Eleven call sites wrote one or both of them, and the rule they were all
+// spelling is one -- a generated file says that it is generated, and says what
+// it was generated from. internal/policy checks the first half from the outside,
+// on the committed bytes; this is where it is decided.
+//
+// source is empty for a file that is not one proto file's worth of output.
+func Preamble(p Printer, header, source string) {
+	p.P(header)
+	if source != "" {
+		p.P("// source: ", source)
+	}
+}
+
 // File is one emitted file.
 type File struct {
 	// Name is a slash-separated path relative to the plugin's output root. It
@@ -135,7 +156,7 @@ func (g *Generator) Warnf(format string, a ...any) {
 // It is unexported, and the export it replaces claimed to be "for targets' own
 // tests". No test ever called it: every target's golden test builds a
 // one-entry Registry and calls Run, which is the only way to exercise the
-// ordering Run guarantees. See docs/extending.md#testing-it.
+// ordering Run guarantees. See docs/extending.md#testing-a-target.
 func newGenerator(s *schema.Schema, l *Lowered, b Backend, entry TargetConfig, diags *schema.Diagnostics) *Generator {
 	return &Generator{schema: s, lowered: l, backend: b, entry: entry, diags: diags}
 }

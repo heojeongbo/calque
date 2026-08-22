@@ -27,8 +27,30 @@ import (
 
 // File accumulates one emitted file.
 type File struct {
-	b     bytes.Buffer
-	depth int
+	b      bytes.Buffer
+	depth  int
+	indent string
+}
+
+// SetIndent chooses the unit one level of depth is written with.
+//
+// The zero value is a tab, so a File nobody configures writes exactly what it
+// wrote before this existed -- which matters more here than usual, because the
+// two generators already served by this package are reproducing committed output
+// byte for byte and a changed indent character is a diff in every line.
+//
+// It exists for Swift, whose tooling emits four spaces and whose committed
+// output already has them. The alternative was a third target that did its own
+// line writing, which is what it was doing, and which is how internal/tsw and
+// internal/prow came to be the same forty lines twice.
+func (f *File) SetIndent(s string) { f.indent = s }
+
+// unit is one level of indentation. Tab unless someone said otherwise.
+func (f *File) unit() string {
+	if f.indent == "" {
+		return "\t"
+	}
+	return f.indent
 }
 
 // P writes one line at the current depth: the arguments concatenated with no
@@ -44,8 +66,9 @@ type File struct {
 // this without moving a byte.
 func (f *File) P(args ...any) {
 	if len(args) > 0 {
+		unit := f.unit()
 		for range f.depth {
-			f.b.WriteByte('\t')
+			f.b.WriteString(unit)
 		}
 	}
 	for _, a := range args {

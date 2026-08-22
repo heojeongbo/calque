@@ -69,10 +69,9 @@ func (t *Target) Storeless() {}
 
 func (t *Target) Configure(cfg *gen.Config, section string) error {
 	var opts Options
-	if _, err := cfg.Section(section, &opts); err != nil {
+	if err := gen.Claim(cfg, section, &opts, (*Options).setDefaults); err != nil {
 		return err
 	}
-	opts.setDefaults()
 	t.opts = opts
 	return nil
 }
@@ -203,8 +202,7 @@ func (t *Target) emitFile(f *file) ([]byte, error) {
 	}
 
 	head := prow.New()
-	head.P(t.opts.Header)
-	head.P("// source: ", f.source)
+	gen.Preamble(head, t.opts.Header, f.source)
 	head.P()
 	head.P(`edition = "2023";`)
 	head.P()

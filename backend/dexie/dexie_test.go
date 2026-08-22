@@ -8,42 +8,67 @@ import (
 
 	"github.com/heojeongbo/calque/backend/dexie"
 	"github.com/heojeongbo/calque/gen"
-	"github.com/heojeongbo/calque/internal/protoc"
-	"github.com/heojeongbo/calque/ormcompat"
+	"github.com/heojeongbo/calque/gentest"
 	"github.com/heojeongbo/calque/schema"
 )
-
-func parse(t *testing.T, file string) *schema.Schema {
-	t.Helper()
-
-	req, err := protoc.CompileRequest(t.Context(),
-		[]string{"../../testdata/proto/valid", "../../testdata/proto/_upstream"},
-		"", file)
-	require.NoError(t, err)
-
-	s, err := ormcompat.Parse(req)
-	require.NoError(t, err)
-	return s
-}
-
-func entity(t *testing.T, s *schema.Schema, name string) *schema.Entity {
-	t.Helper()
-	e, ok := s.Get(name)
-	require.True(t, ok, "%s is missing", name)
-	return e
-}
 
 func configured(t *testing.T, compat string) *dexie.Backend {
 	t.Helper()
 	b := dexie.New()
-	doc := "version: 1\ntargets:\n  - {target: ts, backend: dexie}\n"
+	section := ""
 	if compat != "" {
-		doc += "dexie:\n  compat: " + compat + "\n"
+		section = "dexie:\n  compat: " + compat + "\n"
 	}
-	cfg, err := gen.ParseConfig([]byte(doc), "calque.yaml")
-	require.NoError(t, err)
-	require.NoError(t, b.Configure(cfg, "dexie"))
+	gentest.Configure(t, b, section)
 	return b
+}
+
+// TestContract runs the backend contract in both spellings, because compat is
+// not a formatting option: it decides which name a row is indexed under, so a
+// backend that holds in one mode and not the other holds in neither.
+//
+// The two Paths blocks below are conformance item 4 in the smallest form it has:
+// the same prop, the same store, two names, and only one of them is what a
+// protoc-gen-es message actually carries.
+func TestContract(t *testing.T) {
+	t.Run("compat", func(t *testing.T) {
+		gentest.Run(t, gentest.Case{
+			Backend: dexie.New(),
+			Section: "dexie:\n  compat: orm-ts\n",
+			Paths: map[string]schema.StorePath{
+				// An edge is a nested key path, which is the load-bearing
+				// difference from both SQL backends.
+				"apptest.User.tenant": {"tenant", "id"},
+				// The proto name -- and no row carries it.
+				"namingtest.Device.token_hash": {"token_hash"},
+			},
+			Extra: map[string]map[string]any{
+				"apptest.User": {"stores": "&id,[alias+tenant.id]"},
+			},
+		})
+	})
+
+	t.Run("none", func(t *testing.T) {
+		gentest.Run(t, gentest.Case{
+			Backend: dexie.New(),
+			Section: "dexie:\n  compat: none\n  accept: [unique_compound_index, partial_index]\n",
+			Paths: map[string]schema.StorePath{
+				"apptest.User.tenant": {"tenant", "id"},
+				// The name the row has.
+				"namingtest.Device.token_hash": {"tokenHash"},
+			},
+			Codecs: map[string]gen.CodecName{
+				"apptest.User.id": gen.CodecUUIDString,
+				// IndexedDB holds a Date, so a timestamp is stored as it
+				// arrives -- there is no time codec here and identity is the
+				// honest answer.
+				"apptest.User.date_updated": gen.CodecIdentity,
+				"apptest.User.labels":       gen.CodecJSON,
+				"apptest.User.profile":      gen.CodecJSON,
+				"apptest.User.tenant":       gen.CodecUUIDString,
+			},
+		})
+	})
 }
 
 // TestSchemaStringGrammar reproduces the shapes the corpus contains.
@@ -68,7 +93,7 @@ func TestSchemaStringGrammar(t *testing.T) {
 		{"erased.proto", "erasedtest.Holder", "&id,&alias"},
 	} {
 		t.Run(tc.entity, func(t *testing.T) {
-			got, err := b.SchemaString(entity(t, parse(t, tc.file), tc.entity))
+			got, err := b.SchemaString(gentest.Entity(t, gentest.Schema(t, tc.file), tc.entity))
 			require.NoError(t, err)
 			require.Equal(t, tc.want, got)
 		})
@@ -79,7 +104,7 @@ func TestSchemaStringGrammar(t *testing.T) {
 // different index names to Dexie, and the corpus has the bracketed form.
 func TestSingleMemberIndexKeepsItsBrackets(t *testing.T) {
 	b := configured(t, dexie.CompatORMTS)
-	got, err := b.SchemaString(entity(t, parse(t, "naming.proto"), "namingtest.Device"))
+	got, err := b.SchemaString(gentest.Entity(t, gentest.Schema(t, "naming.proto"), "namingtest.Device"))
 	require.NoError(t, err)
 	require.Contains(t, got, "[device_id]")
 	require.NotContains(t, got, ",device_id,")
@@ -91,8 +116,8 @@ func TestSingleMemberIndexKeepsItsBrackets(t *testing.T) {
 // That is the bug, reproduced on purpose so that swapping generators changes no
 // bytes -- and the fix is one config value away.
 func TestCompatSpellsIndexesWithTheProtoName(t *testing.T) {
-	s := parse(t, "naming.proto")
-	e := entity(t, s, "namingtest.Device")
+	s := gentest.Schema(t, "naming.proto")
+	e := gentest.Entity(t, s, "namingtest.Device")
 
 	compat, err := configured(t, dexie.CompatORMTS).SchemaString(e)
 	require.NoError(t, err)
@@ -115,8 +140,8 @@ func TestCompatSpellsIndexesWithTheProtoName(t *testing.T) {
 // conformance item of its own: a declared index that does not exist is a query
 // plan that will table-scan, and nothing says so today.
 func TestNonUniqueIndexIsNotEmitted(t *testing.T) {
-	s := parse(t, "naming.proto")
-	e := entity(t, s, "namingtest.Device")
+	s := gentest.Schema(t, "naming.proto")
+	e := gentest.Entity(t, s, "namingtest.Device")
 
 	pair, ok := e.Index("pair")
 	require.True(t, ok, "the schema has it")
@@ -129,8 +154,8 @@ func TestNonUniqueIndexIsNotEmitted(t *testing.T) {
 
 // TestMismatchesNamesWhatIsWrong: the bug is reproduced, and also reported.
 func TestMismatchesNamesWhatIsWrong(t *testing.T) {
-	s := parse(t, "naming.proto")
-	e := entity(t, s, "namingtest.Device")
+	s := gentest.Schema(t, "naming.proto")
+	e := gentest.Entity(t, s, "namingtest.Device")
 
 	got := configured(t, dexie.CompatORMTS).Mismatches(e)
 	var names []schema.ProtoName
@@ -146,7 +171,7 @@ func TestMismatchesNamesWhatIsWrong(t *testing.T) {
 	// Single-word keys are the same in both spellings, which is why the bug
 	// stayed hidden for so long.
 	require.Empty(t, configured(t, dexie.CompatORMTS).Mismatches(
-		entity(t, parse(t, "apptest.proto"), "apptest.Tenant")))
+		gentest.Entity(t, gentest.Schema(t, "apptest.proto"), "apptest.Tenant")))
 }
 
 // TestCapabilitiesStateFactsNotWishes: these are what IndexedDB can do, and
@@ -183,8 +208,8 @@ func TestCompatValueIsChecked(t *testing.T) {
 
 // TestUUIDBecomesTextOnBothSides is conformance item 7 from the Dexie side.
 func TestUUIDBecomesText(t *testing.T) {
-	s := parse(t, "apptest.proto")
-	e := entity(t, s, "apptest.User")
+	s := gentest.Schema(t, "apptest.proto")
+	e := gentest.Entity(t, s, "apptest.User")
 	b := configured(t, dexie.CompatORMTS)
 
 	codec, err := b.Codec(e.Key())
@@ -201,11 +226,11 @@ func TestUUIDBecomesText(t *testing.T) {
 }
 
 func TestLowerCarriesTheSchemaString(t *testing.T) {
-	s := parse(t, "apptest.proto")
+	s := gentest.Schema(t, "apptest.proto")
 	l, err := configured(t, dexie.CompatORMTS).Lower(s)
 	require.NoError(t, err)
 
-	table, err := l.Table(entity(t, s, "apptest.User"))
+	table, err := l.Table(gentest.Entity(t, s, "apptest.User"))
 	require.NoError(t, err)
 	require.Equal(t, "&id,[alias+tenant.id]", table.Extra["stores"])
 }
@@ -218,8 +243,8 @@ func TestLowerCarriesTheSchemaString(t *testing.T) {
 // per-prop path map that nothing read; asking the backend here is what keeps a
 // StorePath bug from having to be found in a golden diff.
 func TestEdgeIsAPathNotAColumn(t *testing.T) {
-	s := parse(t, "apptest.proto")
-	tenant, ok := entity(t, s, "apptest.User").Prop("tenant")
+	s := gentest.Schema(t, "apptest.proto")
+	tenant, ok := gentest.Entity(t, s, "apptest.User").Prop("tenant")
 	require.True(t, ok)
 
 	path, err := configured(t, dexie.CompatORMTS).StorePath(tenant)
@@ -294,7 +319,7 @@ func TestEveryDeclaredIndexIsEnforced(t *testing.T) {
 	b := configured(t, dexie.CompatNone)
 
 	for _, file := range []string{"apptest.proto", "erased.proto", "naming.proto"} {
-		s := parse(t, file)
+		s := gentest.Schema(t, file)
 		for _, e := range s.Entities() {
 			str, err := b.SchemaString(e)
 			require.NoError(t, err)
