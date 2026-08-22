@@ -3,9 +3,11 @@ package cmd
 import (
 	"github.com/heojeongbo/calque/backend/dexie"
 	"github.com/heojeongbo/calque/backend/entsql"
+	"github.com/heojeongbo/calque/backend/grdb"
 	"github.com/heojeongbo/calque/gen"
 	"github.com/heojeongbo/calque/target/gotarget"
 	"github.com/heojeongbo/calque/target/service"
+	"github.com/heojeongbo/calque/target/swifttarget"
 	"github.com/heojeongbo/calque/target/ts"
 )
 
@@ -22,6 +24,8 @@ func Registry() *gen.Registry {
 		Target(ts.New()).
 		Target(gotarget.New()).
 		Target(service.New()).
+		Target(swifttarget.New()).
 		Backend(dexie.New()).
-		Backend(entsql.New())
+		Backend(entsql.New()).
+		Backend(grdb.New())
 }
