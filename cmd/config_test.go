@@ -1,6 +1,7 @@
 package cmd_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/lesomnus/xli/xlitest"
@@ -57,7 +58,10 @@ func TestConfigFailsTheWayABuildWould(t *testing.T) {
 	got := config(t, "-c", "testdata/unknown-target.yaml")
 
 	require.ErrorContains(t, got.Err, `no target named "nope"`)
-	require.ErrorContains(t, got.Err, "this build has go, service, ts")
+	// Read the list off the registry rather than spelling it: a hardcoded list
+	// makes registering a target a failing test in a package that has nothing to
+	// do with it, which is what happened when swift was added.
+	require.ErrorContains(t, got.Err, "this build has "+strings.Join(cmd.Registry().TargetNames(), ", "))
 }
 
 func TestConfigRefusesASectionNobodyClaims(t *testing.T) {
