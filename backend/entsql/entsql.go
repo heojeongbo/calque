@@ -46,6 +46,12 @@ type Options struct {
 	Table map[string]string `yaml:"table"`
 }
 
+func (o *Options) setDefaults() {
+	if o.Dialect == "" {
+		o.Dialect = DialectSQLite
+	}
+}
+
 // Backend is the ent/SQL backend.
 type Backend struct {
 	opts Options
@@ -56,17 +62,15 @@ func New() *Backend { return &Backend{opts: Options{Dialect: DialectSQLite}} }
 func (b *Backend) Name() string { return "entsql" }
 
 func (b *Backend) Configure(cfg *gen.Config, section string) error {
-	opts := Options{Dialect: DialectSQLite}
-	if _, err := cfg.Section(section, &opts); err != nil {
+	var opts Options
+	if err := gen.Claim(cfg, section, &opts, (*Options).setDefaults); err != nil {
 		return err
 	}
-	switch opts.Dialect {
-	case DialectSQLite, DialectPostgres, DialectMySQL:
-	case "":
-		opts.Dialect = DialectSQLite
-	default:
-		return fmt.Errorf("entsql: dialect %q is not sqlite, postgres or mysql", opts.Dialect)
+	if _, err := gen.OneOf("entsql", "dialect", opts.Dialect,
+		DialectSQLite, DialectSQLite, DialectPostgres, DialectMySQL); err != nil {
+		return err
 	}
+
 	b.opts = opts
 	return nil
 }
@@ -133,23 +137,14 @@ func (storePathVisitor) VisitEdge(e *schema.Edge) (schema.StorePath, error) {
 // way — the same text the Dexie side stores. Conformance item 7 is that these
 // two agree, and they agree here by naming the same codec rather than by
 // coincidence.
-func (b *Backend) Codec(p schema.Prop) (gen.CodecName, error) {
-	switch p.Type() {
-	case schema.TypeUUID:
-		return gen.CodecUUIDString, nil
-	case schema.TypeTime:
-		return gen.CodecTimeNative, nil
-	case schema.TypeJSON:
-		return gen.CodecJSON, nil
-	case schema.TypeMessage:
-		if e, ok := p.(*schema.Edge); ok && e.Target() != nil && e.Target().Key() != nil {
-			return b.Codec(e.Target().Key())
-		}
-		return gen.CodecJSON, nil
-	default:
-		return gen.CodecIdentity, nil
-	}
+var codecs = gen.CodecTable{
+	schema.TypeUUID:    gen.CodecUUIDString,
+	schema.TypeTime:    gen.CodecTimeNative,
+	schema.TypeJSON:    gen.CodecJSON,
+	schema.TypeMessage: gen.CodecJSON,
 }
+
+func (b *Backend) Codec(p schema.Prop) (gen.CodecName, error) { return codecs.Codec(p), nil }
 
 // TableName is the physical table.
 //
@@ -170,28 +165,7 @@ func (b *Backend) TableName(e *schema.Entity) string {
 func (b *Backend) EntIdent(p schema.Prop) string { return entname.Pascal(string(p.Name())) }
 
 func (b *Backend) Lower(s *schema.Schema) (*gen.Lowered, error) {
-	l := &gen.Lowered{Schema: s, Backend: b.Name(), Tables: map[*schema.Entity]*gen.Table{}}
-
-	for _, e := range s.Entities() {
-		if e.Key() == nil {
-			return nil, fmt.Errorf("entsql: %s has no key", e.FullName())
-		}
-
-		t := &gen.Table{
-			Entity: e,
-			Codec:  map[schema.Prop]gen.CodecName{},
-			Extra:  map[string]any{"dialect": string(b.opts.Dialect)},
-		}
-
-		for _, p := range e.Props() {
-			codec, err := b.Codec(p)
-			if err != nil {
-				return nil, fmt.Errorf("entsql: %s.%s: %w", e.FullName(), p.Name(), err)
-			}
-			t.Codec[p] = codec
-		}
-
-		l.Tables[e] = t
-	}
-	return l, nil
+	return gen.LowerTables(b, s, func(e *schema.Entity) (map[string]any, error) {
+		return map[string]any{"dialect": string(b.opts.Dialect)}, nil
+	})
 }

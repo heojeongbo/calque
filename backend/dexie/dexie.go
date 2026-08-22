@@ -13,7 +13,6 @@ package dexie
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/heojeongbo/calque/gen"
@@ -50,7 +49,7 @@ type Options struct {
 	//
 	// A list rather than a boolean, because a boolean would also accept the
 	// next shortfall, of some other kind, that nobody has looked at.
-	Accept []string `yaml:"accept"`
+	Accept gen.Accept `yaml:"accept"`
 }
 
 const (
@@ -59,6 +58,12 @@ const (
 	// CompatNone spells everything the way the row actually carries it.
 	CompatNone = "none"
 )
+
+func (o *Options) setDefaults() {
+	if o.Compat == "" {
+		o.Compat = CompatORMTS
+	}
+}
 
 // Backend is the Dexie backend.
 type Backend struct {
@@ -71,29 +76,16 @@ func New() *Backend { return &Backend{opts: Options{Compat: CompatORMTS}} }
 func (b *Backend) Name() string { return "dexie" }
 
 func (b *Backend) Configure(cfg *gen.Config, section string) error {
-	opts := Options{Compat: CompatORMTS}
-	if _, err := cfg.Section(section, &opts); err != nil {
+	var opts Options
+	if err := gen.Claim(cfg, section, &opts, (*Options).setDefaults); err != nil {
 		return err
 	}
-	switch opts.Compat {
-	case CompatORMTS, CompatNone:
-	case "":
-		opts.Compat = CompatORMTS
-	default:
-		return fmt.Errorf("dexie: compat %q is not %q or %q", opts.Compat, CompatORMTS, CompatNone)
+	if _, err := gen.OneOf("dexie", "compat", opts.Compat, CompatORMTS, CompatORMTS, CompatNone); err != nil {
+		return err
 	}
 
-	// A misspelled kind would accept nothing and look like it accepted
-	// something, which is the failure mode this whole option exists to avoid.
-	known := map[string]bool{}
-	for _, k := range gen.AllShortfallKinds() {
-		known[string(k)] = true
-	}
-	for _, name := range opts.Accept {
-		if !known[name] {
-			return fmt.Errorf("dexie: accept %q is not a shortfall kind\n\tcalque knows: %s",
-				name, strings.Join(gen.ShortfallKindNames(), ", "))
-		}
+	if err := opts.Accept.Validate("dexie"); err != nil {
+		return err
 	}
 
 	b.opts = opts
@@ -116,7 +108,7 @@ func (b *Backend) Accepts(kind gen.ShortfallKind) bool {
 	if !b.Strict() {
 		return true
 	}
-	return slices.Contains(b.opts.Accept, string(kind))
+	return b.opts.Accept.Accepts(kind)
 }
 
 // Capabilities states what IndexedDB can hold, not what calque wishes it could.
@@ -153,7 +145,37 @@ func (b *Backend) Capabilities() gen.Capabilities {
 // An edge is stored as its target's key under the edge's own name, which
 // IndexedDB indexes as a nested key path.
 func (b *Backend) StorePath(p schema.Prop) (schema.StorePath, error) {
+	path, err := b.storePath(p)
+	if err != nil {
+		return nil, fmt.Errorf("dexie: %w", err)
+	}
+	return path, nil
+}
+
+// storePath is the same answer without this package's name on the error, for the
+// callers below that put their own context on it instead.
+func (b *Backend) storePath(p schema.Prop) (schema.StorePath, error) {
 	return schema.VisitProp[schema.StorePath](p, storePathVisitor{compat: b.compat()})
+}
+
+// path is where a prop lives, spelled the way IndexedDB spells a key path.
+//
+// The schema string used to compute a prop's spelling itself, in two more
+// visitors, so where a value lives and where the store is told it lives were two
+// computations of one rule -- and they agreed only because every key in the
+// corpus is `id`. A multi-word key would have gone wrong in one of them and not
+// the other, and nothing would have said so, which is the same failure
+// conformance item 4 already is.
+//
+// So compat is decided in name(), read by storePathVisitor, and reached from
+// here. One place, and the schema string is now a reader of the store path
+// rather than a second opinion about it.
+func (b *Backend) path(p schema.Prop) (string, error) {
+	sp, err := b.storePath(p)
+	if err != nil {
+		return "", err
+	}
+	return sp.String(), nil
 }
 
 type storePathVisitor struct{ compat bool }
@@ -163,8 +185,9 @@ func (v storePathVisitor) VisitField(f *schema.Field) (schema.StorePath, error) 
 }
 
 func (v storePathVisitor) VisitEdge(e *schema.Edge) (schema.StorePath, error) {
-	if e.Target() == nil || e.Target().Key() == nil {
-		return nil, fmt.Errorf("dexie: %s points at an entity with no key", e.Name())
+	key, err := e.TargetKey()
+	if err != nil {
+		return nil, err
 	}
 	// Both components go through name(). The second one is read off the embedded
 	// ref, which protoc-gen-es builds from the same descriptor and therefore
@@ -173,7 +196,7 @@ func (v storePathVisitor) VisitEdge(e *schema.Edge) (schema.StorePath, error) {
 	// `id`.
 	return schema.StorePath{
 		schema.StoreName(name(e, v.compat)),
-		schema.StoreName(name(e.Target().Key(), v.compat)),
+		schema.StoreName(name(key, v.compat)),
 	}, nil
 }
 
@@ -183,53 +206,24 @@ func (v storePathVisitor) VisitEdge(e *schema.Edge) (schema.StorePath, error) {
 // The Go side of this ecosystem stores the same text, through google/uuid's
 // driver.Valuer, so the two agree by construction rather than by accident —
 // conformance item 7.
-func (b *Backend) Codec(p schema.Prop) (gen.CodecName, error) {
-	switch p.Type() {
-	case schema.TypeUUID:
-		return gen.CodecUUIDString, nil
-	case schema.TypeJSON:
-		return gen.CodecJSON, nil
-	case schema.TypeMessage:
-		// An edge is stored as its target's key, so its codec is the target's.
-		if e, ok := p.(*schema.Edge); ok && e.Target() != nil && e.Target().Key() != nil {
-			return b.Codec(e.Target().Key())
-		}
-		return gen.CodecJSON, nil
-	default:
-		return gen.CodecIdentity, nil
-	}
+// A time is absent from the table on purpose: IndexedDB holds a Date, so a
+// timestamp is stored as it arrives and identity is the honest answer.
+var codecs = gen.CodecTable{
+	schema.TypeUUID:    gen.CodecUUIDString,
+	schema.TypeJSON:    gen.CodecJSON,
+	schema.TypeMessage: gen.CodecJSON,
 }
 
+func (b *Backend) Codec(p schema.Prop) (gen.CodecName, error) { return codecs.Codec(p), nil }
+
 func (b *Backend) Lower(s *schema.Schema) (*gen.Lowered, error) {
-	l := &gen.Lowered{Schema: s, Backend: b.Name(), Tables: map[*schema.Entity]*gen.Table{}}
-
-	for _, e := range s.Entities() {
-		if e.Key() == nil {
-			return nil, fmt.Errorf("dexie: %s has no key", e.FullName())
-		}
-
+	return gen.LowerTables(b, s, func(e *schema.Entity) (map[string]any, error) {
 		stores, err := b.SchemaString(e)
 		if err != nil {
 			return nil, err
 		}
-
-		t := &gen.Table{
-			Entity: e,
-			Codec:  map[schema.Prop]gen.CodecName{},
-			Extra:  map[string]any{"stores": stores},
-		}
-
-		for _, p := range e.Props() {
-			codec, err := b.Codec(p)
-			if err != nil {
-				return nil, fmt.Errorf("dexie: %s.%s: %w", e.FullName(), p.Name(), err)
-			}
-			t.Codec[p] = codec
-		}
-
-		l.Tables[e] = t
-	}
-	return l, nil
+		return map[string]any{"stores": stores}, nil
+	})
 }
 
 // SchemaString builds the `version().stores()` value for one entity.
@@ -240,17 +234,21 @@ func (b *Backend) Lower(s *schema.Schema) (*gen.Lowered, error) {
 // uniqueness silently disappears; Capabilities says so and the run reports it.
 func (b *Backend) SchemaString(e *schema.Entity) (string, error) {
 	var sb strings.Builder
-	// The key goes through name() like everything else. It reads as though it
-	// could not matter -- every key in the corpus is `id` -- but a multi-word
-	// key would have been spelled wrong even with compat off, which is the one
-	// place this bug could have survived the fix.
-	sb.WriteString("&" + name(e.Key(), b.compat()))
+	// The key goes through the store path like everything else. It reads as
+	// though it could not matter -- every key in the corpus is `id` -- but a
+	// multi-word key would have been spelled wrong even with compat off, which
+	// is the one place this bug could have survived the fix.
+	key, err := b.path(e.Key())
+	if err != nil {
+		return "", err
+	}
+	sb.WriteString("&" + key)
 
-	for _, key := range e.Keys() {
-		if key == schema.Elem(e.Key()) {
+	for _, k := range e.Keys() {
+		if k == schema.Elem(e.Key()) {
 			continue
 		}
-		part, err := b.keyPart(key)
+		part, err := b.keyPart(k)
 		if err != nil {
 			return "", err
 		}
@@ -260,26 +258,33 @@ func (b *Backend) SchemaString(e *schema.Entity) (string, error) {
 }
 
 func (b *Backend) keyPart(key schema.Elem) (string, error) {
-	return schema.VisitElem[string](key, keyPartVisitor{compat: b.compat()})
+	return schema.VisitElem[string](key, keyPartVisitor{b: b})
 }
 
-type keyPartVisitor struct{ compat bool }
+type keyPartVisitor struct{ b *Backend }
 
-func (v keyPartVisitor) VisitField(f *schema.Field) (string, error) {
-	return "&" + name(f, v.compat), nil
-}
+func (v keyPartVisitor) VisitField(f *schema.Field) (string, error) { return v.unique(f) }
 
-func (v keyPartVisitor) VisitEdge(e *schema.Edge) (string, error) {
-	if e.Target() == nil || e.Target().Key() == nil {
-		return "", fmt.Errorf("%s points at an entity with no key", e.Name())
+func (v keyPartVisitor) VisitEdge(e *schema.Edge) (string, error) { return v.unique(e) }
+
+// unique is a candidate key of its own: the path it lives at, marked unique.
+//
+// A field and an edge differ in where they live and not in what "&" means, and
+// that difference is StorePath's to state. Two visitor arms that agreed on the
+// "&" and disagreed on nothing else were two chances to spell one of them
+// differently.
+func (v keyPartVisitor) unique(p schema.Prop) (string, error) {
+	path, err := v.b.path(p)
+	if err != nil {
+		return "", err
 	}
-	return "&" + name(e, v.compat) + "." + name(e.Target().Key(), v.compat), nil
+	return "&" + path, nil
 }
 
 func (v keyPartVisitor) VisitIndex(idx *schema.Index) (string, error) {
 	parts := make([]string, 0, len(idx.Props()))
 	for _, p := range idx.Props() {
-		part, err := schema.VisitProp[string](p, indexMemberVisitor{compat: v.compat})
+		part, err := v.b.path(p)
 		if err != nil {
 			return "", fmt.Errorf("{indexes}(%s): %w", idx.Name(), err)
 		}
@@ -296,7 +301,7 @@ func (v keyPartVisitor) VisitIndex(idx *schema.Index) (string, error) {
 	// multi-member one is queryable, because that branch searches by key path,
 	// but it is not unique -- and Dexie holds `&[a+b]` perfectly well, which is
 	// measured in the runtime package's tests rather than assumed here.
-	if v.compat {
+	if v.b.compat() {
 		return "[" + strings.Join(parts, "+") + "]", nil
 	}
 
@@ -311,19 +316,6 @@ func (v keyPartVisitor) VisitIndex(idx *schema.Index) (string, error) {
 		return prefix + parts[0], nil
 	}
 	return prefix + "[" + strings.Join(parts, "+") + "]", nil
-}
-
-type indexMemberVisitor struct{ compat bool }
-
-func (v indexMemberVisitor) VisitField(f *schema.Field) (string, error) {
-	return name(f, v.compat), nil
-}
-
-func (v indexMemberVisitor) VisitEdge(e *schema.Edge) (string, error) {
-	if e.Target() == nil || e.Target().Key() == nil {
-		return "", fmt.Errorf("%s points at an entity with no key", e.Name())
-	}
-	return name(e, v.compat) + "." + name(e.Target().Key(), v.compat), nil
 }
 
 func (b *Backend) compat() bool { return b.opts.Compat == CompatORMTS }
